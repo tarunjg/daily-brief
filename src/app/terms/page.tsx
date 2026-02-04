@@ -1,15 +1,26 @@
 import Link from 'next/link';
 import { ArrowLeft } from 'lucide-react';
+import { Logo } from '@/components/ui/logo';
+import { Footer } from '@/components/layout/footer';
 
 export const metadata = {
-  title: 'Terms of Service | Daily Brief',
-  description: 'Terms of service for using Daily Brief',
+  title: 'Terms of Service | My My Daily Briefinging',
+  description: 'Terms of service for using My My Daily Briefinging',
 };
 
 export default function TermsPage() {
   return (
-    <div className="min-h-screen bg-surface-50">
-      <main className="max-w-3xl mx-auto px-4 sm:px-6 py-12">
+    <div className="min-h-screen bg-surface-50 flex flex-col">
+      {/* Header */}
+      <header className="border-b border-surface-200 bg-white">
+        <div className="max-w-3xl mx-auto px-4 sm:px-6 py-4">
+          <Link href="/">
+            <Logo />
+          </Link>
+        </div>
+      </header>
+
+      <main className="flex-1 max-w-3xl mx-auto px-4 sm:px-6 py-12 w-full">
         <Link
           href="/"
           className="inline-flex items-center gap-2 text-sm text-surface-500 hover:text-surface-700 mb-8"
@@ -31,8 +42,8 @@ export default function TermsPage() {
               The Basics
             </h2>
             <p className="text-surface-700 leading-relaxed">
-              Daily Brief is a service that curates personalized content and helps you build
-              a learning log through reflections. By using Daily Brief, you agree to these terms.
+              My Daily Briefing is a service that curates personalized content and helps you build
+              a learning log through reflections. By using My Daily Briefing, you agree to these terms.
               They&apos;re straightforward — we want you to understand what you&apos;re agreeing to.
             </p>
           </section>
@@ -43,11 +54,11 @@ export default function TermsPage() {
             </h2>
             <div className="space-y-4 text-surface-700 leading-relaxed">
               <p>
-                You need a Google account to use Daily Brief. You&apos;re responsible for
+                You need a Google account to use My Daily Briefing. You&apos;re responsible for
                 keeping your account secure and for all activity that happens under it.
               </p>
               <p>
-                You must be at least 13 years old to use Daily Brief. If you&apos;re under 18,
+                You must be at least 13 years old to use My Daily Briefing. If you&apos;re under 18,
                 please make sure a parent or guardian is okay with you using the service.
               </p>
             </div>
@@ -60,7 +71,7 @@ export default function TermsPage() {
             <div className="space-y-4 text-surface-700 leading-relaxed">
               <p>
                 Your reflections, notes, and voice recordings belong to you. We don&apos;t claim
-                ownership of anything you create in Daily Brief.
+                ownership of anything you create in My Daily Briefing.
               </p>
               <p>
                 By using the service, you give us permission to store, display, and process
@@ -68,7 +79,7 @@ export default function TermsPage() {
                 learning log to Google Docs or transcribing your voice notes.
               </p>
               <p>
-                Please don&apos;t use Daily Brief to store or share content that&apos;s illegal,
+                Please don&apos;t use My Daily Briefing to store or share content that&apos;s illegal,
                 harmful, or violates others&apos; rights.
               </p>
             </div>
@@ -80,7 +91,7 @@ export default function TermsPage() {
             </h2>
             <div className="space-y-4 text-surface-700 leading-relaxed">
               <p>
-                We work hard to make Daily Brief useful and reliable, but we can&apos;t promise
+                We work hard to make My Daily Briefing useful and reliable, but we can&apos;t promise
                 it will always be available or error-free. Sometimes things break, and we
                 appreciate your patience while we fix them.
               </p>
@@ -101,7 +112,7 @@ export default function TermsPage() {
               Acceptable Use
             </h2>
             <p className="text-surface-700 leading-relaxed mb-4">
-              We trust you to use Daily Brief responsibly. Please don&apos;t:
+              We trust you to use My Daily Briefing responsibly. Please don&apos;t:
             </p>
             <ul className="list-disc list-inside space-y-2 text-surface-700 leading-relaxed">
               <li>Attempt to access other users&apos; accounts or data</li>
@@ -118,12 +129,12 @@ export default function TermsPage() {
             </h2>
             <div className="space-y-4 text-surface-700 leading-relaxed">
               <p>
-                We may update Daily Brief and these terms from time to time. We&apos;ll let
+                We may update My Daily Briefing and these terms from time to time. We&apos;ll let
                 you know about significant changes. Continued use after changes means
                 you accept the new terms.
               </p>
               <p>
-                You can stop using Daily Brief anytime. We can also suspend or terminate
+                You can stop using My Daily Briefing anytime. We can also suspend or terminate
                 accounts that violate these terms, though we&apos;ll try to give you notice
                 when possible.
               </p>
@@ -135,7 +146,7 @@ export default function TermsPage() {
               Limitation of Liability
             </h2>
             <p className="text-surface-700 leading-relaxed">
-              Daily Brief is provided &quot;as is.&quot; We do our best, but we can&apos;t guarantee
+              My Daily Briefing is provided &quot;as is.&quot; We do our best, but we can&apos;t guarantee
               the service will meet all your needs or be uninterrupted. To the extent
               permitted by law, we&apos;re not liable for any indirect, incidental, or
               consequential damages arising from your use of the service.
@@ -157,10 +168,12 @@ export default function TermsPage() {
 
         <div className="mt-12 pt-8 border-t border-surface-200">
           <p className="text-sm text-surface-500">
-            See also: <Link href="/privacy" className="text-brand-600 hover:text-brand-700 underline">Privacy Policy</Link>
+            See also: <Link href="/privacy" className="text-[#1E3A5F] hover:text-[#2D4A6F] underline">Privacy Policy</Link>
           </p>
         </div>
       </main>
+
+      <Footer />
     </div>
   );
 }

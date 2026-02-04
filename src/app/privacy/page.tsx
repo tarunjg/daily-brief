@@ -1,15 +1,26 @@
 import Link from 'next/link';
 import { ArrowLeft } from 'lucide-react';
+import { Logo } from '@/components/ui/logo';
+import { Footer } from '@/components/layout/footer';
 
 export const metadata = {
-  title: 'Privacy Policy | Daily Brief',
-  description: 'How we handle your data at Daily Brief',
+  title: 'Privacy Policy | My My Daily Briefinging',
+  description: 'How we handle your data at My My Daily Briefinging',
 };
 
 export default function PrivacyPage() {
   return (
-    <div className="min-h-screen bg-surface-50">
-      <main className="max-w-3xl mx-auto px-4 sm:px-6 py-12">
+    <div className="min-h-screen bg-surface-50 flex flex-col">
+      {/* Header */}
+      <header className="border-b border-surface-200 bg-white">
+        <div className="max-w-3xl mx-auto px-4 sm:px-6 py-4">
+          <Link href="/">
+            <Logo />
+          </Link>
+        </div>
+      </header>
+
+      <main className="flex-1 max-w-3xl mx-auto px-4 sm:px-6 py-12 w-full">
         <Link
           href="/"
           className="inline-flex items-center gap-2 text-sm text-surface-500 hover:text-surface-700 mb-8"
@@ -31,7 +42,7 @@ export default function PrivacyPage() {
               The Short Version
             </h2>
             <p className="text-surface-700 leading-relaxed">
-              We collect only what we need to make Daily Brief work for you. We don&apos;t sell your data,
+              We collect only what we need to make My Daily Briefing work for you. We don&apos;t sell your data,
               we don&apos;t show you ads, and we don&apos;t share your information with third parties
               except as needed to provide the service. Your reflections and notes are yours.
             </p>
@@ -67,7 +78,7 @@ export default function PrivacyPage() {
                 <h3 className="font-medium text-surface-900 mb-1">Usage Data</h3>
                 <p>
                   We collect basic analytics about how you use the service (pages visited, features used)
-                  to improve Daily Brief. This data is aggregated and not tied to your personal identity.
+                  to improve My Daily Briefing. This data is aggregated and not tied to your personal identity.
                 </p>
               </div>
             </div>
@@ -92,7 +103,7 @@ export default function PrivacyPage() {
               Third-Party Services
             </h2>
             <p className="text-surface-700 leading-relaxed mb-4">
-              We use trusted third-party services to provide Daily Brief:
+              We use trusted third-party services to provide My Daily Briefing:
             </p>
             <ul className="list-disc list-inside space-y-2 text-surface-700 leading-relaxed">
               <li><strong>Google</strong> — Authentication and Google Docs integration</li>
@@ -142,7 +153,7 @@ export default function PrivacyPage() {
             </h2>
             <p className="text-surface-700 leading-relaxed">
               We may update this policy from time to time. If we make significant changes,
-              we&apos;ll notify you through the app or via email. Continued use of Daily Brief
+              we&apos;ll notify you through the app or via email. Continued use of My Daily Briefing
               after changes constitutes acceptance of the updated policy.
             </p>
           </section>
@@ -162,10 +173,12 @@ export default function PrivacyPage() {
 
         <div className="mt-12 pt-8 border-t border-surface-200">
           <p className="text-sm text-surface-500">
-            See also: <Link href="/terms" className="text-brand-600 hover:text-brand-700 underline">Terms of Service</Link>
+            See also: <Link href="/terms" className="text-[#1E3A5F] hover:text-[#2D4A6F] underline">Terms of Service</Link>
           </p>
         </div>
       </main>
+
+      <Footer />
     </div>
   );
 }

@@ -2,8 +2,9 @@
 
 import { useSession, signOut } from 'next-auth/react';
 import Link from 'next/link';
-import { BookOpen, Settings, LogOut, Menu, X } from 'lucide-react';
+import { Settings, LogOut, Menu, X } from 'lucide-react';
 import { useState } from 'react';
+import { Logo } from '@/components/ui/logo';
 
 export function AppHeader() {
   const { data: session } = useSession();
@@ -12,16 +13,10 @@ export function AppHeader() {
   return (
     <header className="sticky top-0 z-50 bg-white/80 backdrop-blur-md border-b border-surface-200">
       <div className="max-w-3xl mx-auto px-4 sm:px-6">
-        <div className="flex items-center justify-between h-14">
+        <div className="flex items-center justify-between h-16">
           {/* Logo */}
-          <Link href="/brief" className="flex items-center gap-2.5 group">
-            <div className="w-8 h-8 rounded-lg bg-brand-600 flex items-center justify-center
-                          group-hover:bg-brand-700 transition-colors">
-              <BookOpen className="w-4 h-4 text-white" />
-            </div>
-            <span className="font-display text-lg font-bold text-surface-900">
-              Daily Brief
-            </span>
+          <Link href="/brief" className="flex items-center group">
+            <Logo className="transform group-hover:scale-[1.02] transition-transform" />
           </Link>
 
           {/* Desktop nav */}
