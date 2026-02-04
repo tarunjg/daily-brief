@@ -54,7 +54,7 @@ async function extractArticleContent(url: string, fallbackContent: string): Prom
     const { extract } = await import('@extractus/article-extractor');
     const article = await extract(url, {
       timeout: 8000,
-    });
+    } as Parameters<typeof extract>[1]);
     if (article?.content) {
       // Strip HTML tags and truncate
       const text = article.content.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();

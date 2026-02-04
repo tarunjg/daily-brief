@@ -25,7 +25,7 @@ export async function transcribeAudio(
         'Authorization': `Token ${apiKey}`,
         'Content-Type': mimeType,
       },
-      body: audioBuffer,
+      body: new Uint8Array(audioBuffer),
     });
 
     if (!response.ok) {
