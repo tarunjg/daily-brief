@@ -4,8 +4,9 @@ import { articles, userPreferences } from '@/lib/db/schema';
 import { desc, gte } from 'drizzle-orm';
 import { eq } from 'drizzle-orm';
 import type { GoalEntry, UserProfilePayload } from '@/types';
+import { getRequiredEnv } from '@/lib/env';
 
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+const openai = new OpenAI({ apiKey: getRequiredEnv('OPENAI_API_KEY') });
 
 /**
  * Compute embedding for a text string using OpenAI.

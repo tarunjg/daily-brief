@@ -2,6 +2,7 @@ import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import CryptoJS from 'crypto-js';
 import { createHash } from 'crypto';
+import { getOptionalEnv } from '@/lib/env';
 
 /** Tailwind class merger */
 export function cn(...inputs: ClassValue[]) {
@@ -9,8 +10,13 @@ export function cn(...inputs: ClassValue[]) {
 }
 
 function getEncryptionKey(): string {
+  const key = getOptionalEnv('NEXTAUTH_SECRET');
+  if (key) return key;
+  if (process.env.NODE_ENV === 'production') {
+    throw new Error('[Config] Missing NEXTAUTH_SECRET for encryption');
+  }
   // NOTE: Fallback exists for local/dev convenience. It is not safe for production.
-  return process.env.NEXTAUTH_SECRET || 'fallback-key';
+  return 'fallback-key';
 }
 
 /** Encrypt sensitive data at rest */

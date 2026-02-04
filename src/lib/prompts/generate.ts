@@ -1,8 +1,9 @@
 import Anthropic from '@anthropic-ai/sdk';
 import type { GeneratedBrief, ArticlePayload, UserProfilePayload } from '@/types';
 import { wordCount } from '@/lib/utils';
+import { getRequiredEnv } from '@/lib/env';
 
-const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+const anthropic = new Anthropic({ apiKey: getRequiredEnv('ANTHROPIC_API_KEY') });
 
 // ─── System Prompt (never changes) ───
 const SYSTEM_PROMPT = `You are the user's go-to sideline analyst — think a mix between a sharp sports commentator and a brilliant friend who reads everything so they don't have to. Your job is to break down the day's most important news like you're breaking down game film: clear, punchy, and always connecting the play to the bigger picture.

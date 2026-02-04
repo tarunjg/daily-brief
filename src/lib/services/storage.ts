@@ -1,21 +1,22 @@
 import { Storage } from '@google-cloud/storage';
+import { getOptionalEnv, getRequiredEnv } from '@/lib/env';
 
 let storage: Storage | null = null;
 
 function getStorage(): Storage {
   if (!storage) {
     storage = new Storage({
-      projectId: process.env.GCS_PROJECT_ID,
+      projectId: getRequiredEnv('GCS_PROJECT_ID'),
       credentials: {
-        client_email: process.env.GCS_CLIENT_EMAIL,
-        private_key: process.env.GCS_PRIVATE_KEY?.replace(/\\n/g, '\n'),
+        client_email: getRequiredEnv('GCS_CLIENT_EMAIL'),
+        private_key: getRequiredEnv('GCS_PRIVATE_KEY').replace(/\\n/g, '\n'),
       },
     });
   }
   return storage;
 }
 
-const BUCKET_NAME = process.env.GCS_BUCKET_NAME || 'daily-brief-audio';
+const BUCKET_NAME = getOptionalEnv('GCS_BUCKET_NAME', 'daily-brief-audio')!;
 
 /**
  * Generate a signed upload URL for direct client-side upload.

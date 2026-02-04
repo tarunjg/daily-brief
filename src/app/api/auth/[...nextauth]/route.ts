@@ -3,6 +3,7 @@ import GoogleProvider from 'next-auth/providers/google';
 import { db } from '@/lib/db';
 import { users, accounts, sessions, userPreferences } from '@/lib/db/schema';
 import { eq } from 'drizzle-orm';
+import { getRequiredEnv } from '@/lib/env';
 
 declare module 'next-auth' {
   interface Session {
@@ -30,8 +31,8 @@ declare module 'next-auth/jwt' {
 export const authOptions: NextAuthOptions = {
   providers: [
     GoogleProvider({
-      clientId: process.env.GOOGLE_CLIENT_ID!,
-      clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
+      clientId: getRequiredEnv('GOOGLE_CLIENT_ID'),
+      clientSecret: getRequiredEnv('GOOGLE_CLIENT_SECRET'),
       authorization: {
         params: {
           scope: [
@@ -142,7 +143,7 @@ export const authOptions: NextAuthOptions = {
     maxAge: 30 * 24 * 60 * 60, // 30 days
   },
 
-  secret: process.env.NEXTAUTH_SECRET,
+  secret: getRequiredEnv('NEXTAUTH_SECRET'),
 };
 
 const handler = NextAuth(authOptions);

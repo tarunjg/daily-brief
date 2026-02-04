@@ -1,8 +1,9 @@
 import { google } from 'googleapis';
 import { db } from '@/lib/db';
 import { users, notes, voiceNotes, digestItems, digests, docExports } from '@/lib/db/schema';
-import { eq, and } from 'drizzle-orm';
+import { eq, and, inArray } from 'drizzle-orm';
 import { formatDate } from '@/lib/utils';
+import { getRequiredEnv } from '@/lib/env';
 
 type DocsRequest = {
   insertText?: {
@@ -26,8 +27,8 @@ type DocsRequest = {
  */
 function getDocsClient(accessToken: string, refreshToken: string) {
   const oauth2Client = new google.auth.OAuth2(
-    process.env.GOOGLE_CLIENT_ID,
-    process.env.GOOGLE_CLIENT_SECRET,
+    getRequiredEnv('GOOGLE_CLIENT_ID'),
+    getRequiredEnv('GOOGLE_CLIENT_SECRET'),
   );
 
   oauth2Client.setCredentials({
@@ -40,8 +41,8 @@ function getDocsClient(accessToken: string, refreshToken: string) {
 
 function getDriveClient(accessToken: string, refreshToken: string) {
   const oauth2Client = new google.auth.OAuth2(
-    process.env.GOOGLE_CLIENT_ID,
-    process.env.GOOGLE_CLIENT_SECRET,
+    getRequiredEnv('GOOGLE_CLIENT_ID'),
+    getRequiredEnv('GOOGLE_CLIENT_SECRET'),
   );
 
   oauth2Client.setCredentials({
@@ -140,7 +141,7 @@ export async function appendReflectionsToDoc(userId: string): Promise<{ exported
 
   const voiceNotesData = voiceNoteIds.length > 0
     ? await db.select().from(voiceNotes).where(
-        eq(voiceNotes.noteId, voiceNoteIds[0]) // simplified; in production, use inArray
+        inArray(voiceNotes.noteId, voiceNoteIds)
       )
     : [];
 

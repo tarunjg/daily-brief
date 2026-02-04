@@ -1,4 +1,5 @@
 import type { TranscriptionStatus } from '@/types';
+import { getRequiredEnv } from '@/lib/env';
 
 interface TranscriptionResult {
   transcript: string;
@@ -15,10 +16,7 @@ export async function transcribeAudio(
   audioBuffer: Buffer,
   mimeType: string = 'audio/webm',
 ): Promise<TranscriptionResult> {
-  const apiKey = process.env.DEEPGRAM_API_KEY;
-  if (!apiKey) {
-    throw new Error('DEEPGRAM_API_KEY is not configured');
-  }
+  const apiKey = getRequiredEnv('DEEPGRAM_API_KEY');
 
   try {
     const response = await fetch('https://api.deepgram.com/v1/listen?model=nova-2&smart_format=true&punctuate=true&diarize=false&language=en', {
@@ -65,10 +63,7 @@ export async function transcribeAudio(
  * Transcribe audio from a URL (e.g., a GCS signed URL).
  */
 export async function transcribeFromUrl(audioUrl: string): Promise<TranscriptionResult> {
-  const apiKey = process.env.DEEPGRAM_API_KEY;
-  if (!apiKey) {
-    throw new Error('DEEPGRAM_API_KEY is not configured');
-  }
+  const apiKey = getRequiredEnv('DEEPGRAM_API_KEY');
 
   try {
     const response = await fetch('https://api.deepgram.com/v1/listen?model=nova-2&smart_format=true&punctuate=true&language=en', {

@@ -1,7 +1,8 @@
 import { Resend } from 'resend';
 import type { BriefEmailData, DigestItem } from '@/types';
+import { getOptionalEnv, getRequiredEnv } from '@/lib/env';
 
-const resend = new Resend(process.env.RESEND_API_KEY);
+const resend = new Resend(getRequiredEnv('RESEND_API_KEY'));
 
 /**
  * Generate the HTML email for the daily brief.
@@ -89,7 +90,7 @@ export async function sendBriefEmail(
 ): Promise<{ success: boolean; messageId?: string; error?: string }> {
   try {
     const result = await resend.emails.send({
-      from: process.env.EMAIL_FROM || 'Daily Brief <brief@yourdomain.com>',
+      from: getOptionalEnv('EMAIL_FROM', 'Daily Brief <brief@yourdomain.com>')!,
       to,
       subject: `Your Daily Brief – ${data.briefDate}`,
       html: buildBriefEmailHtml(data),
