@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
-import { authOptions } from '@/app/api/auth/[...nextauth]/route';
+import { authOptions } from '@/lib/auth-options';
 import { uploadAudioBuffer } from '@/lib/services/storage';
 import { db } from '@/lib/db';
 import { voiceNotes, notes } from '@/lib/db/schema';
