@@ -80,7 +80,7 @@ export function AudioPlayer({ digestId, audioUrl: initialAudioUrl, briefDate }: 
     }
   };
 
-  const togglePlay = () => {
+  const togglePlay = async () => {
     const audio = audioRef.current;
     const lofi = lofiRef.current;
 
@@ -89,13 +89,23 @@ export function AudioPlayer({ digestId, audioUrl: initialAudioUrl, briefDate }: 
     if (isPlaying) {
       audio.pause();
       if (lofi) lofi.pause();
+      setIsPlaying(false);
     } else {
-      audio.play();
-      if (lofi && lofiEnabled) {
-        lofi.play();
+      try {
+        await audio.play();
+        setIsPlaying(true);
+        // Try to play ambient music (may fail due to browser restrictions)
+        if (lofi && lofiEnabled) {
+          lofi.play().catch(() => {
+            // Ambient music blocked, continue without it
+            console.log('Ambient music unavailable');
+          });
+        }
+      } catch (error) {
+        console.error('Failed to play audio:', error);
+        toast.error('Failed to play audio');
       }
     }
-    setIsPlaying(!isPlaying);
   };
 
   const seek = (seconds: number) => {

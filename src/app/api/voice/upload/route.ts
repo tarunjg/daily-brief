@@ -37,7 +37,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Note not found' }, { status: 404 });
     }
 
-    // Upload to GCS
+    // Upload to Supabase Storage
     const filePath = await uploadAudioBuffer(
       session.user.id,
       note.id,

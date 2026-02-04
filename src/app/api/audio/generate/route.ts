@@ -125,9 +125,9 @@ export async function POST(req: NextRequest) {
     // Generate audio using OpenAI TTS
     const mp3Response = await openai.audio.speech.create({
       model: 'tts-1-hd',
-      voice: 'onyx', // warm, conversational male voice
+      voice: 'nova', // bright, friendly, expressive voice
       input: script,
-      speed: 0.95, // slightly slower for clarity
+      speed: 1.0,
     });
 
     // Get the audio buffer

@@ -1,11 +1,12 @@
 import { db } from '@/lib/db';
 import { users, userPreferences, digests, digestItems, articles } from '@/lib/db/schema';
-import { and, eq, desc, inArray } from 'drizzle-orm';
+import { and, eq, desc, inArray, asc } from 'drizzle-orm';
 import { runIngestionPipeline } from './ingest';
 import { rankArticlesForUser, semanticDedup, buildProfilePayload } from './ranking';
 import { generateBrief } from '@/lib/prompts/generate';
 import { sendBriefEmail } from '@/lib/services/email';
 import { formatDate, formatShortDate } from '@/lib/utils';
+import { generateAudioForDigest } from '@/lib/services/audio-generation';
 import type { ArticlePayload } from '@/types';
 
 /**
@@ -160,6 +161,11 @@ export async function generateBriefForUser(
         appUrl: process.env.APP_URL || 'http://localhost:3000',
       });
     }
+
+    // Step 8: Pre-generate audio (async, don't block)
+    generateAudioForDigest(digest.id).catch(err => {
+      console.log(`[Pipeline] Audio generation skipped for ${digest.id}:`, err.message);
+    });
 
     const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
     console.log(`[Pipeline] Brief generated for ${user.email} in ${elapsed}s (${brief.items.length} items, ${brief.totalWordCount} words)`);

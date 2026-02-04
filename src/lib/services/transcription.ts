@@ -1,5 +1,5 @@
 import type { TranscriptionStatus } from '@/types';
-import { getRequiredEnv } from '@/lib/env';
+import OpenAI, { toFile } from 'openai';
 
 interface TranscriptionResult {
   transcript: string;
@@ -8,45 +8,43 @@ interface TranscriptionResult {
   durationSeconds: number;
 }
 
+function getOpenAIClient() {
+  return new OpenAI({
+    apiKey: process.env.OPENAI_API_KEY,
+  });
+}
+
 /**
- * Transcribe audio using Deepgram Nova-2 API.
- * Supports WebM, MP4, WAV, and other common formats.
+ * Transcribe audio using OpenAI Whisper API.
+ * Supports WebM, MP4, WAV, MP3, and other common formats.
  */
 export async function transcribeAudio(
   audioBuffer: Buffer,
   mimeType: string = 'audio/webm',
 ): Promise<TranscriptionResult> {
-  const apiKey = getRequiredEnv('DEEPGRAM_API_KEY');
+  const openai = getOpenAIClient();
 
   try {
-    const response = await fetch('https://api.deepgram.com/v1/listen?model=nova-2&smart_format=true&punctuate=true&diarize=false&language=en', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Token ${apiKey}`,
-        'Content-Type': mimeType,
-      },
-      body: new Uint8Array(audioBuffer),
+    // Determine file extension from mime type
+    const ext = mimeType.includes('mp4') ? 'mp4'
+      : mimeType.includes('wav') ? 'wav'
+      : mimeType.includes('mp3') ? 'mp3'
+      : 'webm';
+
+    // Convert buffer to file using OpenAI's helper
+    const file = await toFile(audioBuffer, `audio.${ext}`, { type: mimeType });
+
+    const response = await openai.audio.transcriptions.create({
+      model: 'whisper-1',
+      file: file,
+      language: 'en',
     });
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error('[Transcription] Deepgram error:', errorText);
-      throw new Error(`Deepgram API error: ${response.status}`);
-    }
-
-    const data = await response.json();
-    const channel = data.results?.channels?.[0];
-    const alternative = channel?.alternatives?.[0];
-
-    if (!alternative) {
-      throw new Error('No transcription result returned');
-    }
-
     return {
-      transcript: alternative.transcript || '',
-      confidence: alternative.confidence || 0,
+      transcript: response.text || '',
+      confidence: 0.95, // Whisper doesn't return confidence, assume high
       status: 'completed',
-      durationSeconds: Math.ceil(data.metadata?.duration || 0),
+      durationSeconds: 0, // Whisper doesn't return duration in basic response
     };
   } catch (error) {
     console.error('[Transcription] Failed:', error);
@@ -60,34 +58,22 @@ export async function transcribeAudio(
 }
 
 /**
- * Transcribe audio from a URL (e.g., a GCS signed URL).
+ * Transcribe audio from a URL by downloading and processing it.
  */
 export async function transcribeFromUrl(audioUrl: string): Promise<TranscriptionResult> {
-  const apiKey = getRequiredEnv('DEEPGRAM_API_KEY');
-
   try {
-    const response = await fetch('https://api.deepgram.com/v1/listen?model=nova-2&smart_format=true&punctuate=true&language=en', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Token ${apiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ url: audioUrl }),
-    });
-
+    // Download the audio file
+    const response = await fetch(audioUrl);
     if (!response.ok) {
-      throw new Error(`Deepgram API error: ${response.status}`);
+      throw new Error(`Failed to fetch audio: ${response.status}`);
     }
 
-    const data = await response.json();
-    const alternative = data.results?.channels?.[0]?.alternatives?.[0];
+    const arrayBuffer = await response.arrayBuffer();
+    const buffer = Buffer.from(arrayBuffer);
+    const contentType = response.headers.get('content-type') || 'audio/webm';
 
-    return {
-      transcript: alternative?.transcript || '',
-      confidence: alternative?.confidence || 0,
-      status: 'completed',
-      durationSeconds: Math.ceil(data.metadata?.duration || 0),
-    };
+    // Use the buffer transcription
+    return transcribeAudio(buffer, contentType);
   } catch (error) {
     console.error('[Transcription] URL transcription failed:', error);
     return {

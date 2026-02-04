@@ -1,68 +1,20 @@
-import { Storage } from '@google-cloud/storage';
-import { getOptionalEnv, getRequiredEnv } from '@/lib/env';
+import { createClient, SupabaseClient } from '@supabase/supabase-js';
 
-let storage: Storage | null = null;
+const VOICE_BUCKET = 'voice-recordings';
 
-function getStorage(): Storage {
-  if (!storage) {
-    storage = new Storage({
-      projectId: getRequiredEnv('GCS_PROJECT_ID'),
-      credentials: {
-        client_email: getRequiredEnv('GCS_CLIENT_EMAIL'),
-        private_key: getRequiredEnv('GCS_PRIVATE_KEY').replace(/\\n/g, '\n'),
-      },
-    });
+function getSupabaseClient(): SupabaseClient {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+  if (!url || !key) {
+    throw new Error('Supabase configuration missing');
   }
-  return storage;
-}
 
-const BUCKET_NAME = getOptionalEnv('GCS_BUCKET_NAME', 'daily-brief-audio')!;
-
-/**
- * Generate a signed upload URL for direct client-side upload.
- */
-export async function getSignedUploadUrl(
-  userId: string,
-  noteId: string,
-  contentType: string = 'audio/webm',
-): Promise<{ uploadUrl: string; filePath: string }> {
-  const gcs = getStorage();
-  const filePath = `audio/${userId}/${noteId}.webm`;
-  const bucket = gcs.bucket(BUCKET_NAME);
-  const file = bucket.file(filePath);
-
-  const [url] = await file.getSignedUrl({
-    version: 'v4',
-    action: 'write',
-    expires: Date.now() + 15 * 60 * 1000, // 15 minutes
-    contentType,
-  });
-
-  return { uploadUrl: url, filePath };
+  return createClient(url, key);
 }
 
 /**
- * Generate a signed download URL for playback.
- */
-export async function getSignedPlaybackUrl(
-  filePath: string,
-  expiresInMinutes: number = 60,
-): Promise<string> {
-  const gcs = getStorage();
-  const bucket = gcs.bucket(BUCKET_NAME);
-  const file = bucket.file(filePath);
-
-  const [url] = await file.getSignedUrl({
-    version: 'v4',
-    action: 'read',
-    expires: Date.now() + expiresInMinutes * 60 * 1000,
-  });
-
-  return url;
-}
-
-/**
- * Upload audio buffer directly from the server.
+ * Upload audio buffer directly from the server to Supabase Storage.
  */
 export async function uploadAudioBuffer(
   userId: string,
@@ -70,34 +22,48 @@ export async function uploadAudioBuffer(
   buffer: Buffer,
   contentType: string = 'audio/webm',
 ): Promise<string> {
-  const gcs = getStorage();
-  const filePath = `audio/${userId}/${noteId}.webm`;
-  const bucket = gcs.bucket(BUCKET_NAME);
-  const file = bucket.file(filePath);
+  const supabase = getSupabaseClient();
+  const ext = contentType.includes('mp4') ? 'mp4' : 'webm';
+  const filePath = `${userId}/${noteId}.${ext}`;
 
-  await file.save(buffer, {
-    contentType,
-    metadata: {
-      userId,
-      noteId,
-      uploadedAt: new Date().toISOString(),
-    },
-  });
+  const { error } = await supabase.storage
+    .from(VOICE_BUCKET)
+    .upload(filePath, buffer, {
+      contentType,
+      upsert: true,
+    });
+
+  if (error) {
+    console.error('[Storage] Upload error:', error);
+    throw new Error('Failed to upload audio');
+  }
 
   return filePath;
 }
 
 /**
- * Delete an audio file.
+ * Get the public URL for an audio file.
+ */
+export function getPublicUrl(filePath: string): string {
+  const supabase = getSupabaseClient();
+  const { data } = supabase.storage
+    .from(VOICE_BUCKET)
+    .getPublicUrl(filePath);
+
+  return data.publicUrl;
+}
+
+/**
+ * Delete an audio file from storage.
  */
 export async function deleteAudioFile(filePath: string): Promise<void> {
-  const gcs = getStorage();
-  const bucket = gcs.bucket(BUCKET_NAME);
-  const file = bucket.file(filePath);
+  const supabase = getSupabaseClient();
 
   try {
-    await file.delete();
+    await supabase.storage
+      .from(VOICE_BUCKET)
+      .remove([filePath]);
   } catch (error) {
-    console.error(`[GCS] Failed to delete ${filePath}:`, error);
+    console.error(`[Storage] Failed to delete ${filePath}:`, error);
   }
 }
