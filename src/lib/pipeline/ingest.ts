@@ -52,9 +52,7 @@ async function extractArticleContent(url: string, fallbackContent: string): Prom
   try {
     // Dynamic import to handle the ESM module
     const { extract } = await import('@extractus/article-extractor');
-    const article = await extract(url, {
-      timeout: 8000,
-    });
+    const article = await extract(url);
     if (article?.content) {
       // Strip HTML tags and truncate
       const text = article.content.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
