@@ -225,10 +225,18 @@ export function BriefAudioPlayer({ items, digestDate }: Props) {
         if (url && mainAudioRef.current) {
           mainAudioRef.current.play();
           setIsPlaying(true);
-        } else if (audioMode === 'webspeech') {
-          // Fallback triggered
-          playWithWebSpeech();
-          setIsPlaying(true);
+        } else if (!url) {
+          // ElevenLabs failed, fallback to web speech
+          const startSpeaking = () => {
+            playWithWebSpeech();
+            setIsPlaying(true);
+          };
+
+          if (window.speechSynthesis.getVoices().length === 0) {
+            window.speechSynthesis.onvoiceschanged = startSpeaking;
+          } else {
+            startSpeaking();
+          }
         }
       } else {
         // Use Web Speech API
