@@ -152,7 +152,10 @@ export default function PrivacyPage() {
               Contact
             </h2>
             <p className="text-surface-700 leading-relaxed">
-              Questions about this policy? Reach out to us and we&apos;ll be happy to help.
+              Questions about this policy? Email us at{' '}
+              <a href="mailto:tarunjg@gmail.com" className="text-brand-600 hover:text-brand-700 underline">
+                tarunjg@gmail.com
+              </a>
             </p>
           </section>
         </div>

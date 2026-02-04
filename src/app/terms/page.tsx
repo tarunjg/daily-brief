@@ -147,7 +147,10 @@ export default function TermsPage() {
               Contact
             </h2>
             <p className="text-surface-700 leading-relaxed">
-              Questions about these terms? We&apos;re happy to clarify anything — just reach out.
+              Questions about these terms? Email us at{' '}
+              <a href="mailto:tarunjg@gmail.com" className="text-brand-600 hover:text-brand-700 underline">
+                tarunjg@gmail.com
+              </a>
             </p>
           </section>
         </div>
