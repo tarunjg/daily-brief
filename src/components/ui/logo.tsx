@@ -46,7 +46,7 @@ export function Logo({ className = '', showText = true }: LogoProps) {
             Daily
           </span>
           <span className="text-[10px] sm:text-xs font-semibold tracking-[0.15em] text-[#1E3A5F] uppercase -mt-0.5">
-            Briefing
+            Brief
           </span>
         </div>
       )}

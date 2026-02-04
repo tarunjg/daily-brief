@@ -4,8 +4,8 @@ import { Logo } from '@/components/ui/logo';
 import { Footer } from '@/components/layout/footer';
 
 export const metadata = {
-  title: 'Privacy Policy | My Daily Briefing',
-  description: 'How we handle your data at My Daily Briefing',
+  title: 'Privacy Policy | My Daily Brief',
+  description: 'How we handle your data at My Daily Brief',
 };
 
 export default function PrivacyPage() {
@@ -42,7 +42,7 @@ export default function PrivacyPage() {
               The Short Version
             </h2>
             <p className="text-surface-700 leading-relaxed">
-              We collect only what we need to make My Daily Briefing work for you. We don&apos;t sell your data,
+              We collect only what we need to make My Daily Brief work for you. We don&apos;t sell your data,
               we don&apos;t show you ads, and we don&apos;t share your information with third parties
               except as needed to provide the service. Your reflections and notes are yours.
             </p>
@@ -78,7 +78,7 @@ export default function PrivacyPage() {
                 <h3 className="font-medium text-surface-900 mb-1">Usage Data</h3>
                 <p>
                   We collect basic analytics about how you use the service (pages visited, features used)
-                  to improve My Daily Briefing. This data is aggregated and not tied to your personal identity.
+                  to improve My Daily Brief. This data is aggregated and not tied to your personal identity.
                 </p>
               </div>
             </div>
@@ -103,7 +103,7 @@ export default function PrivacyPage() {
               Third-Party Services
             </h2>
             <p className="text-surface-700 leading-relaxed mb-4">
-              We use trusted third-party services to provide My Daily Briefing:
+              We use trusted third-party services to provide My Daily Brief:
             </p>
             <ul className="list-disc list-inside space-y-2 text-surface-700 leading-relaxed">
               <li><strong>Google</strong> — Authentication and Google Docs integration</li>
@@ -153,7 +153,7 @@ export default function PrivacyPage() {
             </h2>
             <p className="text-surface-700 leading-relaxed">
               We may update this policy from time to time. If we make significant changes,
-              we&apos;ll notify you through the app or via email. Continued use of My Daily Briefing
+              we&apos;ll notify you through the app or via email. Continued use of My Daily Brief
               after changes constitutes acceptance of the updated policy.
             </p>
           </section>

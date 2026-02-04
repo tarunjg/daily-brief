@@ -14,7 +14,7 @@ export default function SignInPage() {
               <Logo />
             </div>
             <h1 className="font-display text-display-sm text-surface-900 mb-2">
-              Welcome to My Daily Briefing
+              Welcome to My Daily Brief
             </h1>
             <p className="text-surface-500 text-sm">
               Sign in to get your personalized daily intelligence.
