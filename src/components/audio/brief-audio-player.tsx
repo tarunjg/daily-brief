@@ -1,7 +1,8 @@
 'use client';
 
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { Play, Pause, SkipBack, SkipForward, Music, Volume2 } from 'lucide-react';
+import { Play, Pause, SkipBack, SkipForward, Music, Volume2, Loader2 } from 'lucide-react';
+import { toast } from 'sonner';
 
 interface BriefItem {
   id: string;
@@ -15,29 +16,50 @@ interface Props {
   digestDate: string;
 }
 
+type AudioMode = 'elevenlabs' | 'webspeech' | 'loading';
+
 export function BriefAudioPlayer({ items, digestDate }: Props) {
   const [isPlaying, setIsPlaying] = useState(false);
-  const [currentItemIndex, setCurrentItemIndex] = useState(0);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const [ambientVolume, setAmbientVolume] = useState(0.3);
   const [showAmbientControl, setShowAmbientControl] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [ambientAvailable, setAmbientAvailable] = useState(true);
+  const [audioMode, setAudioMode] = useState<AudioMode>('loading');
+  const [audioUrl, setAudioUrl] = useState<string | null>(null);
+  const [generatingAudio, setGeneratingAudio] = useState(false);
 
+  const mainAudioRef = useRef<HTMLAudioElement | null>(null);
   const ambientAudioRef = useRef<HTMLAudioElement | null>(null);
-  const progressIntervalRef = useRef<NodeJS.Timeout | null>(null);
-  const startTimeRef = useRef<number>(0);
-  const isPausedRef = useRef(false);
+  const webSpeechItemIndex = useRef(0);
 
-  // Initialize ambient audio with fallback
+  // Initialize and check if ElevenLabs is available
+  useEffect(() => {
+    // Try to generate audio with ElevenLabs
+    checkElevenLabsAvailability();
+  }, []);
+
+  const checkElevenLabsAvailability = async () => {
+    try {
+      const res = await fetch('/api/tts/voices');
+      if (res.ok) {
+        setAudioMode('elevenlabs');
+      } else {
+        setAudioMode('webspeech');
+      }
+    } catch {
+      setAudioMode('webspeech');
+    }
+  };
+
+  // Initialize ambient audio
   useEffect(() => {
     const audio = new Audio('/audio/lofi-ambient.mp3');
     audio.loop = true;
     audio.volume = ambientVolume;
 
     audio.onerror = () => {
-      console.log('Ambient audio not available');
       setAmbientAvailable(false);
     };
 
@@ -58,43 +80,92 @@ export function BriefAudioPlayer({ items, digestDate }: Props) {
     }
   }, [ambientVolume]);
 
-  // Build the text content for the current item
-  const getItemText = useCallback((index: number): string => {
-    if (index < 0 || index >= items.length) return '';
-    const item = items[index];
-    return `Item ${index + 1}: ${item.title}. ${item.summary}. Why it matters for you: ${item.whyItMatters}`;
-  }, [items]);
+  // Generate ElevenLabs audio
+  const generateElevenLabsAudio = useCallback(async () => {
+    if (audioUrl) return audioUrl; // Already generated
 
-  // Build full brief text for duration estimation
-  const getFullBriefText = useCallback((): string => {
-    const intro = `Your Daily Brief for ${digestDate}. You have ${items.length} items today.`;
-    const itemTexts = items.map((_, i) => getItemText(i)).join(' ');
-    return `${intro} ${itemTexts}`;
-  }, [items, digestDate, getItemText]);
+    setGeneratingAudio(true);
+    try {
+      const res = await fetch('/api/tts/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ items, digestDate }),
+      });
 
-  // Estimate duration (average speaking rate ~150 words per minute)
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        if (data.fallbackToWebSpeech) {
+          setAudioMode('webspeech');
+          return null;
+        }
+        throw new Error('Failed to generate audio');
+      }
+
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      setAudioUrl(url);
+
+      // Create audio element
+      const audio = new Audio(url);
+      audio.addEventListener('loadedmetadata', () => {
+        setDuration(Math.ceil(audio.duration));
+      });
+      audio.addEventListener('timeupdate', () => {
+        setCurrentTime(Math.floor(audio.currentTime));
+      });
+      audio.addEventListener('ended', () => {
+        setIsPlaying(false);
+        setCurrentTime(0);
+        if (ambientAudioRef.current) {
+          ambientAudioRef.current.pause();
+          ambientAudioRef.current.currentTime = 0;
+        }
+      });
+      mainAudioRef.current = audio;
+
+      return url;
+    } catch (error) {
+      console.error('ElevenLabs generation failed:', error);
+      toast.error('Using browser voice (ElevenLabs unavailable)');
+      setAudioMode('webspeech');
+      return null;
+    } finally {
+      setGeneratingAudio(false);
+    }
+  }, [items, digestDate, audioUrl]);
+
+  // Estimate duration for web speech
   useEffect(() => {
-    const fullText = getFullBriefText();
-    const wordCount = fullText.split(/\s+/).length;
-    const estimatedSeconds = Math.ceil((wordCount / 150) * 60);
-    setDuration(estimatedSeconds);
-  }, [getFullBriefText]);
+    if (audioMode === 'webspeech') {
+      const fullText = buildFullText();
+      const wordCount = fullText.split(/\s+/).length;
+      const estimatedSeconds = Math.ceil((wordCount / 150) * 60);
+      setDuration(estimatedSeconds);
+    }
+  }, [audioMode, items, digestDate]);
 
-  // Speak using Web Speech API
-  const speak = useCallback((text: string, onEnd?: () => void) => {
+  const buildFullText = () => {
+    const intro = `Your Daily Brief for ${digestDate}. You have ${items.length} items today.`;
+    const itemTexts = items.map((item, i) =>
+      `Item ${i + 1}: ${item.title}. ${item.summary}. Why it matters for you: ${item.whyItMatters}`
+    ).join(' ');
+    return `${intro} ${itemTexts}`;
+  };
+
+  // Web Speech API playback
+  const playWithWebSpeech = useCallback(() => {
     if (!('speechSynthesis' in window)) {
-      console.error('Speech synthesis not supported');
+      toast.error('Speech synthesis not supported in this browser');
       return;
     }
 
-    // Cancel any ongoing speech
     window.speechSynthesis.cancel();
 
+    const text = buildFullText();
     const utterance = new SpeechSynthesisUtterance(text);
     utterance.rate = 1.0;
     utterance.pitch = 1.0;
 
-    // Try to get a natural-sounding voice
     const voices = window.speechSynthesis.getVoices();
     const preferredVoice = voices.find(v =>
       v.name.includes('Google') ||
@@ -108,8 +179,11 @@ export function BriefAudioPlayer({ items, digestDate }: Props) {
     }
 
     utterance.onend = () => {
-      if (!isPausedRef.current) {
-        onEnd?.();
+      setIsPlaying(false);
+      setCurrentTime(0);
+      if (ambientAudioRef.current) {
+        ambientAudioRef.current.pause();
+        ambientAudioRef.current.currentTime = 0;
       }
     };
 
@@ -121,157 +195,126 @@ export function BriefAudioPlayer({ items, digestDate }: Props) {
     };
 
     window.speechSynthesis.speak(utterance);
-  }, []);
+  }, [items, digestDate]);
 
-  // Play the intro
-  const playIntro = useCallback(() => {
-    const intro = `Your Daily Brief for ${digestDate}. You have ${items.length} items today.`;
-    speak(intro, () => {
-      playItem(0);
-    });
-  }, [digestDate, items.length, speak]);
-
-  // Play a specific item - defined with useCallback
-  const playItem = useCallback((index: number) => {
-    if (index >= items.length) {
-      // Finished all items
-      setIsPlaying(false);
-      setCurrentItemIndex(0);
-      setCurrentTime(0);
-      if (ambientAudioRef.current) {
-        ambientAudioRef.current.pause();
-        ambientAudioRef.current.currentTime = 0;
-      }
-      if (progressIntervalRef.current) {
-        clearInterval(progressIntervalRef.current);
-      }
-      return;
-    }
-
-    setCurrentItemIndex(index);
-    const text = getItemText(index);
-    speak(text, () => {
-      playItem(index + 1);
-    });
-  }, [items.length, getItemText, speak]);
-
-  // Start/stop playback
-  const togglePlayback = useCallback(() => {
+  // Toggle playback
+  const togglePlayback = useCallback(async () => {
     if (isPlaying) {
       // Pause
-      isPausedRef.current = true;
-      window.speechSynthesis.cancel();
+      if (audioMode === 'elevenlabs' && mainAudioRef.current) {
+        mainAudioRef.current.pause();
+      } else {
+        window.speechSynthesis.cancel();
+      }
       if (ambientAudioRef.current) {
         ambientAudioRef.current.pause();
-      }
-      if (progressIntervalRef.current) {
-        clearInterval(progressIntervalRef.current);
       }
       setIsPlaying(false);
     } else {
       // Play
-      isPausedRef.current = false;
-      setIsPlaying(true);
       setIsLoading(true);
 
-      // Start ambient music if available
+      // Start ambient music
       if (ambientAudioRef.current && ambientVolume > 0 && ambientAvailable) {
-        ambientAudioRef.current.play().catch(() => {
-          setAmbientAvailable(false);
-        });
+        ambientAudioRef.current.play().catch(() => setAmbientAvailable(false));
       }
 
-      // Start progress tracking
-      startTimeRef.current = Date.now() - (currentTime * 1000);
-      progressIntervalRef.current = setInterval(() => {
-        const elapsed = Math.floor((Date.now() - startTimeRef.current) / 1000);
-        setCurrentTime(Math.min(elapsed, duration));
-      }, 1000);
-
-      // Load voices if needed (Chrome requires this)
-      const startSpeaking = () => {
-        setIsLoading(false);
-        if (currentItemIndex === 0 && currentTime === 0) {
-          playIntro();
-        } else {
-          playItem(currentItemIndex);
+      if (audioMode === 'elevenlabs') {
+        // Generate audio if not already done
+        const url = await generateElevenLabsAudio();
+        if (url && mainAudioRef.current) {
+          mainAudioRef.current.play();
+          setIsPlaying(true);
+        } else if (audioMode === 'webspeech') {
+          // Fallback triggered
+          playWithWebSpeech();
+          setIsPlaying(true);
         }
-      };
-
-      if (window.speechSynthesis.getVoices().length === 0) {
-        window.speechSynthesis.onvoiceschanged = startSpeaking;
       } else {
-        startSpeaking();
+        // Use Web Speech API
+        const startSpeaking = () => {
+          playWithWebSpeech();
+          setIsPlaying(true);
+        };
+
+        if (window.speechSynthesis.getVoices().length === 0) {
+          window.speechSynthesis.onvoiceschanged = startSpeaking;
+        } else {
+          startSpeaking();
+        }
       }
-    }
-  }, [isPlaying, currentTime, duration, currentItemIndex, ambientVolume, ambientAvailable, playIntro, playItem]);
 
-  // Skip to previous item
-  const skipPrevious = useCallback(() => {
-    const newIndex = Math.max(0, currentItemIndex - 1);
-    window.speechSynthesis.cancel();
-    setCurrentItemIndex(newIndex);
-    if (isPlaying) {
-      isPausedRef.current = false;
-      playItem(newIndex);
+      setIsLoading(false);
     }
-  }, [currentItemIndex, isPlaying, playItem]);
+  }, [isPlaying, audioMode, ambientVolume, ambientAvailable, generateElevenLabsAudio, playWithWebSpeech]);
 
-  // Skip to next item
-  const skipNext = useCallback(() => {
-    const newIndex = Math.min(items.length - 1, currentItemIndex + 1);
-    window.speechSynthesis.cancel();
-    setCurrentItemIndex(newIndex);
-    if (isPlaying) {
-      isPausedRef.current = false;
-      playItem(newIndex);
+  // Seek (for ElevenLabs audio only)
+  const handleSeek = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const newTime = parseFloat(e.target.value);
+    setCurrentTime(newTime);
+    if (mainAudioRef.current) {
+      mainAudioRef.current.currentTime = newTime;
     }
-  }, [currentItemIndex, items.length, isPlaying, playItem]);
+  };
+
+  // Skip forward/back 15 seconds
+  const skip = (seconds: number) => {
+    if (audioMode === 'elevenlabs' && mainAudioRef.current) {
+      const newTime = Math.max(0, Math.min(duration, mainAudioRef.current.currentTime + seconds));
+      mainAudioRef.current.currentTime = newTime;
+      setCurrentTime(Math.floor(newTime));
+    }
+  };
 
   // Format time as m:ss
   const formatTime = (seconds: number): string => {
     const m = Math.floor(seconds / 60);
-    const s = seconds % 60;
+    const s = Math.floor(seconds % 60);
     return `${m}:${s.toString().padStart(2, '0')}`;
   };
 
   // Progress percentage
   const progressPercent = duration > 0 ? (currentTime / duration) * 100 : 0;
 
-  // Cleanup on unmount
+  // Cleanup
   useEffect(() => {
     return () => {
       window.speechSynthesis.cancel();
-      if (progressIntervalRef.current) {
-        clearInterval(progressIntervalRef.current);
+      if (mainAudioRef.current) {
+        mainAudioRef.current.pause();
+        mainAudioRef.current = null;
+      }
+      if (audioUrl) {
+        URL.revokeObjectURL(audioUrl);
       }
     };
-  }, []);
+  }, [audioUrl]);
 
   return (
     <div className="bg-brand-900 rounded-2xl p-4 shadow-lg mb-6">
       <div className="flex items-center gap-3">
-        {/* Playback controls */}
+        {/* Skip back */}
         <button
-          onClick={skipPrevious}
-          disabled={currentItemIndex === 0 && !isPlaying}
+          onClick={() => skip(-15)}
+          disabled={audioMode !== 'elevenlabs' || !audioUrl}
           className="w-10 h-10 rounded-full bg-brand-800 flex items-center justify-center
                     text-brand-300 hover:text-white hover:bg-brand-700
                     disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-          aria-label="Previous item"
+          aria-label="Skip back 15 seconds"
         >
           <SkipBack className="w-4 h-4" />
         </button>
 
+        {/* Play/Pause */}
         <button
           onClick={togglePlayback}
-          disabled={isLoading}
+          disabled={isLoading || generatingAudio}
           className="w-12 h-12 rounded-full bg-white flex items-center justify-center
                     text-brand-900 hover:bg-brand-100 transition-colors shadow-md"
           aria-label={isPlaying ? 'Pause' : 'Play'}
         >
-          {isLoading ? (
-            <div className="w-5 h-5 border-2 border-brand-900 border-t-transparent rounded-full animate-spin" />
+          {isLoading || generatingAudio ? (
+            <Loader2 className="w-5 h-5 animate-spin" />
           ) : isPlaying ? (
             <Pause className="w-5 h-5" />
           ) : (
@@ -279,13 +322,14 @@ export function BriefAudioPlayer({ items, digestDate }: Props) {
           )}
         </button>
 
+        {/* Skip forward */}
         <button
-          onClick={skipNext}
-          disabled={currentItemIndex === items.length - 1 && !isPlaying}
+          onClick={() => skip(15)}
+          disabled={audioMode !== 'elevenlabs' || !audioUrl}
           className="w-10 h-10 rounded-full bg-brand-800 flex items-center justify-center
                     text-brand-300 hover:text-white hover:bg-brand-700
                     disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-          aria-label="Next item"
+          aria-label="Skip forward 15 seconds"
         >
           <SkipForward className="w-4 h-4" />
         </button>
@@ -296,12 +340,26 @@ export function BriefAudioPlayer({ items, digestDate }: Props) {
             {formatTime(currentTime)}
           </span>
 
-          <div className="flex-1 h-1.5 bg-brand-800 rounded-full overflow-hidden min-w-0">
-            <div
-              className="h-full bg-brand-400 rounded-full transition-all duration-300"
-              style={{ width: `${progressPercent}%` }}
+          {audioMode === 'elevenlabs' && audioUrl ? (
+            <input
+              type="range"
+              min="0"
+              max={duration}
+              value={currentTime}
+              onChange={handleSeek}
+              className="flex-1 h-1.5 bg-brand-800 rounded-full appearance-none cursor-pointer
+                        [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-3
+                        [&::-webkit-slider-thumb]:h-3 [&::-webkit-slider-thumb]:rounded-full
+                        [&::-webkit-slider-thumb]:bg-brand-400"
             />
-          </div>
+          ) : (
+            <div className="flex-1 h-1.5 bg-brand-800 rounded-full overflow-hidden min-w-0">
+              <div
+                className="h-full bg-brand-400 rounded-full transition-all duration-300"
+                style={{ width: `${progressPercent}%` }}
+              />
+            </div>
+          )}
 
           <span className="text-sm text-brand-300 font-mono w-10 flex-shrink-0">
             {formatTime(duration)}
@@ -346,7 +404,7 @@ export function BriefAudioPlayer({ items, digestDate }: Props) {
                 </>
               ) : (
                 <p className="text-xs text-surface-400">
-                  Add a lofi track to /public/audio/lofi-ambient.mp3 to enable
+                  Add lofi-ambient.mp3 to /public/audio/
                 </p>
               )}
             </div>
@@ -354,15 +412,17 @@ export function BriefAudioPlayer({ items, digestDate }: Props) {
         </div>
       </div>
 
-      {/* Current item indicator */}
+      {/* Status indicator */}
       <div className="mt-3 flex items-center gap-2">
         <Volume2 className="w-3.5 h-3.5 text-brand-400" />
         <span className="text-xs text-brand-300">
-          {isPlaying
-            ? `Playing item ${currentItemIndex + 1} of ${items.length}`
-            : currentTime > 0
-              ? `Paused at item ${currentItemIndex + 1} of ${items.length}`
-              : `${items.length} items ready to play`
+          {generatingAudio
+            ? 'Generating audio with ElevenLabs...'
+            : isPlaying
+              ? `Playing ${items.length} items`
+              : audioMode === 'elevenlabs'
+                ? `${items.length} items · ElevenLabs voice`
+                : `${items.length} items · Browser voice`
           }
         </span>
       </div>
