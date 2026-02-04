@@ -46,18 +46,17 @@ export async function generateBriefForUser(
 
   const today = new Date().toISOString().split('T')[0];
 
-  // If a ready digest already exists for today, reuse it.
-  const [existingReadyDigest] = await db.select()
+  // If a digest already exists for today, reuse it (avoid duplicates on concurrent runs).
+  const [existingDigest] = await db.select()
     .from(digests)
     .where(and(
       eq(digests.userId, userId),
       eq(digests.digestDate, today),
-      eq(digests.status, 'ready'),
     ))
     .limit(1);
-  if (existingReadyDigest) {
+  if (existingDigest) {
     console.log(`[Pipeline] Reusing existing digest for ${userId} (${today})`);
-    return existingReadyDigest.id;
+    return existingDigest.id;
   }
 
   // Create digest record
@@ -194,7 +193,7 @@ export async function generateBriefsForAllUsers(): Promise<void> {
   for (const prefs of allPrefs) {
     (prefs.interests || []).forEach(interest => interestSet.add(interest));
   }
-  const combinedInterests = interestSet.size > 0 ? Array.from(interestSet) : undefined;
+  const combinedInterests = Array.from(interestSet);
 
   try {
     await runIngestionPipeline(combinedInterests);
