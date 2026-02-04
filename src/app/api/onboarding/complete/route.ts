@@ -23,6 +23,7 @@ export async function POST(req: NextRequest) {
       seniority: body.seniority || 'IC',
       industries: body.industries || [],
       geography: body.geography || '',
+      funActivities: body.funActivities || [],
       linkedinText: body.linkedinText || null,
       resumeText: body.resumeText || null,
       updatedAt: new Date(),

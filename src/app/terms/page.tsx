@@ -58,8 +58,7 @@ export default function TermsPage() {
                 keeping your account secure and for all activity that happens under it.
               </p>
               <p>
-                You must be at least 13 years old to use My Daily Brief. If you&apos;re under 18,
-                please make sure a parent or guardian is okay with you using the service.
+                You must be at least 18 years old to use My Daily Brief.
               </p>
             </div>
           </section>

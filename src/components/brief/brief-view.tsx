@@ -1,8 +1,9 @@
 'use client';
 
 import { useState } from 'react';
-import { ExternalLink, MessageSquare, Check } from 'lucide-react';
+import { ExternalLink, MessageSquare, Check, ThumbsUp, ThumbsDown, Heart, HeartOff } from 'lucide-react';
 import { ReflectModal } from '@/components/reflection/reflect-modal';
+import { toast } from 'sonner';
 
 interface BriefItem {
   id: string;
@@ -15,6 +16,8 @@ interface BriefItem {
   sourceLinks: { url: string; label: string }[];
   hasReflection: boolean;
   reflectionText: string | null;
+  feedback?: 'more' | 'less' | null;
+  isFavorite?: boolean;
 }
 
 interface Props {
@@ -27,6 +30,57 @@ export function BriefView({ items, digestId }: Props) {
   const [reflectedItems, setReflectedItems] = useState<Set<string>>(
     new Set(items.filter(i => i.hasReflection).map(i => i.id))
   );
+  const [feedbackState, setFeedbackState] = useState<Record<string, 'more' | 'less' | null>>(
+    Object.fromEntries(items.map(i => [i.id, i.feedback || null]))
+  );
+  const [favoriteState, setFavoriteState] = useState<Record<string, boolean>>(
+    Object.fromEntries(items.map(i => [i.id, i.isFavorite || false]))
+  );
+
+  const handleFeedback = async (itemId: string, type: 'more' | 'less') => {
+    const currentFeedback = feedbackState[itemId];
+    const newFeedback = currentFeedback === type ? null : type;
+
+    setFeedbackState(prev => ({ ...prev, [itemId]: newFeedback }));
+
+    try {
+      if (newFeedback) {
+        await fetch('/api/feedback', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ digestItemId: itemId, feedbackType: newFeedback }),
+        });
+      } else {
+        await fetch(`/api/feedback?digestItemId=${itemId}`, { method: 'DELETE' });
+      }
+      toast.success(newFeedback ? `Got it! ${newFeedback === 'more' ? 'More' : 'Less'} like this.` : 'Feedback removed');
+    } catch {
+      setFeedbackState(prev => ({ ...prev, [itemId]: currentFeedback }));
+      toast.error('Failed to save feedback');
+    }
+  };
+
+  const handleFavorite = async (itemId: string) => {
+    const currentFav = favoriteState[itemId];
+    setFavoriteState(prev => ({ ...prev, [itemId]: !currentFav }));
+
+    try {
+      if (!currentFav) {
+        await fetch('/api/favorites', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ digestItemId: itemId }),
+        });
+        toast.success('Added to favorites');
+      } else {
+        await fetch(`/api/favorites?digestItemId=${itemId}`, { method: 'DELETE' });
+        toast.success('Removed from favorites');
+      }
+    } catch {
+      setFavoriteState(prev => ({ ...prev, [itemId]: currentFav }));
+      toast.error('Failed to update favorite');
+    }
+  };
 
   const reflectingItem = items.find(i => i.id === reflectingItemId);
 
@@ -67,9 +121,10 @@ export function BriefView({ items, digestId }: Props) {
             </p>
           </div>
 
-          {/* Footer: links + reflect */}
-          <div className="flex items-center justify-between">
-            <div className="flex gap-3">
+          {/* Footer: links + actions */}
+          <div className="flex flex-col gap-3">
+            {/* Source links */}
+            <div className="flex flex-wrap gap-3">
               {item.sourceLinks.map((link, j) => (
                 <a
                   key={j}
@@ -85,27 +140,77 @@ export function BriefView({ items, digestId }: Props) {
               ))}
             </div>
 
-            <button
-              onClick={() => setReflectingItemId(item.id)}
-              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold
-                transition-all duration-150 ${
-                reflectedItems.has(item.id)
-                  ? 'bg-accent-green/10 text-accent-green'
-                  : 'bg-surface-100 text-surface-600 hover:bg-surface-200'
-              }`}
-            >
-              {reflectedItems.has(item.id) ? (
-                <>
-                  <Check className="w-3.5 h-3.5" />
-                  Reflected
-                </>
-              ) : (
-                <>
-                  <MessageSquare className="w-3.5 h-3.5" />
-                  Reflect
-                </>
-              )}
-            </button>
+            {/* Action buttons */}
+            <div className="flex items-center justify-between pt-2 border-t border-surface-100">
+              {/* Feedback buttons */}
+              <div className="flex items-center gap-1">
+                <button
+                  onClick={() => handleFeedback(item.id, 'more')}
+                  className={`inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium
+                    transition-all duration-150 ${
+                    feedbackState[item.id] === 'more'
+                      ? 'bg-accent-green/15 text-accent-green'
+                      : 'text-surface-400 hover:bg-surface-100 hover:text-surface-600'
+                  }`}
+                  title="More like this"
+                >
+                  <ThumbsUp className="w-3.5 h-3.5" />
+                  <span className="hidden sm:inline">More</span>
+                </button>
+                <button
+                  onClick={() => handleFeedback(item.id, 'less')}
+                  className={`inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium
+                    transition-all duration-150 ${
+                    feedbackState[item.id] === 'less'
+                      ? 'bg-accent-red/15 text-accent-red'
+                      : 'text-surface-400 hover:bg-surface-100 hover:text-surface-600'
+                  }`}
+                  title="Less like this"
+                >
+                  <ThumbsDown className="w-3.5 h-3.5" />
+                  <span className="hidden sm:inline">Less</span>
+                </button>
+                <button
+                  onClick={() => handleFavorite(item.id)}
+                  className={`inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium
+                    transition-all duration-150 ${
+                    favoriteState[item.id]
+                      ? 'bg-accent-red/15 text-accent-red'
+                      : 'text-surface-400 hover:bg-surface-100 hover:text-surface-600'
+                  }`}
+                  title={favoriteState[item.id] ? 'Remove from favorites' : 'Add to favorites'}
+                >
+                  {favoriteState[item.id] ? (
+                    <Heart className="w-3.5 h-3.5 fill-current" />
+                  ) : (
+                    <Heart className="w-3.5 h-3.5" />
+                  )}
+                </button>
+              </div>
+
+              {/* Reflect button */}
+              <button
+                onClick={() => setReflectingItemId(item.id)}
+                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold
+                  transition-all duration-150 ${
+                  reflectedItems.has(item.id)
+                    ? 'bg-accent-green/10 text-accent-green'
+                    : 'bg-surface-100 text-surface-600 hover:bg-surface-200'
+                }`}
+              >
+                {reflectedItems.has(item.id) ? (
+                  <>
+                    <Check className="w-3.5 h-3.5" />
+                    Reflected
+                  </>
+                ) : (
+                  <>
+                    <MessageSquare className="w-3.5 h-3.5" />
+                    Reflect
+                  </>
+                )}
+              </button>
+            </div>
           </div>
 
           {/* Inline reflection preview */}

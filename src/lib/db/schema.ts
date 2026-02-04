@@ -42,6 +42,7 @@ export const userPreferences = pgTable('user_preferences', {
   geography: varchar('geography', { length: 100 }),
   linkedinText: text('linkedin_text'),
   resumeText: text('resume_text'),
+  funActivities: text('fun_activities').array().default([]), // hobbies/interests for metaphors
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 });
@@ -115,6 +116,23 @@ export const voiceNotes = pgTable('voice_notes', {
   transcriptionConfidence: real('transcription_confidence'),
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
+});
+
+// ─── Content Feedback (more/less like this) ───
+export const contentFeedback = pgTable('content_feedback', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  userId: uuid('user_id').references(() => users.id, { onDelete: 'cascade' }).notNull(),
+  digestItemId: uuid('digest_item_id').references(() => digestItems.id, { onDelete: 'cascade' }).notNull(),
+  feedbackType: varchar('feedback_type', { length: 20 }).notNull(), // 'more' | 'less'
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+});
+
+// ─── Favorite Articles ───
+export const favoriteArticles = pgTable('favorite_articles', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  userId: uuid('user_id').references(() => users.id, { onDelete: 'cascade' }).notNull(),
+  digestItemId: uuid('digest_item_id').references(() => digestItems.id, { onDelete: 'cascade' }).notNull(),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
 });
 
 // ─── Doc Exports (audit log) ───

@@ -11,7 +11,13 @@ interface Props {
   userName: string;
 }
 
-const TOTAL_STEPS = 6;
+const TOTAL_STEPS = 7;
+
+const SUGGESTED_FUN_ACTIVITIES = [
+  'Sports', 'Fitness', 'Music', 'Gaming', 'Cooking',
+  'Travel', 'Reading', 'Photography', 'Hiking', 'Art',
+  'Movies & TV', 'Podcasts', 'Gardening', 'Writing', 'Volunteering'
+];
 
 export function OnboardingWizard({ userName }: Props) {
   const router = useRouter();
@@ -29,8 +35,25 @@ export function OnboardingWizard({ userName }: Props) {
   const [timezone, setTimezone] = useState(
     Intl.DateTimeFormat().resolvedOptions().timeZone
   );
+  const [funActivities, setFunActivities] = useState<string[]>([]);
+  const [customActivity, setCustomActivity] = useState('');
   const [linkedinText, setLinkedinText] = useState('');
   const [resumeFile, setResumeFile] = useState<File | null>(null);
+
+  const toggleFunActivity = (activity: string) => {
+    setFunActivities(prev =>
+      prev.includes(activity)
+        ? prev.filter(a => a !== activity)
+        : prev.length < 5 ? [...prev, activity] : prev
+    );
+  };
+
+  const addCustomActivity = () => {
+    if (customActivity.trim() && funActivities.length < 5) {
+      setFunActivities(prev => [...prev, customActivity.trim()]);
+      setCustomActivity('');
+    }
+  };
 
   const toggleInterest = (interest: string) => {
     setInterests(prev =>
@@ -61,8 +84,9 @@ export function OnboardingWizard({ userName }: Props) {
       case 2: return goals.filter(g => g.trim()).length >= 1;
       case 3: return roleTitle.trim() && seniority && industries.length >= 1;
       case 4: return true; // geography is optional (auto-detected)
-      case 5: return true; // linkedin/resume is optional
-      case 6: return true; // confirmation
+      case 5: return true; // fun activities is optional but encouraged
+      case 6: return true; // linkedin/resume is optional
+      case 7: return true; // confirmation
       default: return false;
     }
   };
@@ -97,6 +121,7 @@ export function OnboardingWizard({ userName }: Props) {
           industries,
           geography: geography || 'Not specified',
           timezone,
+          funActivities,
           linkedinText,
           resumeText,
         }),
@@ -329,8 +354,48 @@ export function OnboardingWizard({ userName }: Props) {
           </div>
         )}
 
-        {/* Step 5: Professional Background */}
+        {/* Step 5: Fun Activities */}
         {step === 5 && (
+          <div>
+            <h2 className="font-display text-xl font-semibold text-surface-900 mb-1">
+              What do you enjoy outside work?
+            </h2>
+            <p className="text-surface-500 text-sm mb-6">
+              We'll use these to make explanations more relatable and include some fun content too.
+            </p>
+            <div className="flex flex-wrap gap-2 mb-4">
+              {SUGGESTED_FUN_ACTIVITIES.map(activity => (
+                <button
+                  key={activity}
+                  onClick={() => toggleFunActivity(activity)}
+                  className={funActivities.includes(activity) ? 'pill-active' : 'pill-inactive'}
+                >
+                  {activity}
+                  {funActivities.includes(activity) && <Check className="w-3.5 h-3.5 ml-1" />}
+                </button>
+              ))}
+            </div>
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={customActivity}
+                onChange={e => setCustomActivity(e.target.value)}
+                onKeyDown={e => e.key === 'Enter' && addCustomActivity()}
+                placeholder="Add your own..."
+                className="input-field flex-1"
+              />
+              <button onClick={addCustomActivity} className="btn-secondary">
+                Add
+              </button>
+            </div>
+            <p className="text-xs text-surface-400 mt-3">
+              {funActivities.length}/5 selected (optional but helps personalization!)
+            </p>
+          </div>
+        )}
+
+        {/* Step 6: Professional Background */}
+        {step === 6 && (
           <div>
             <h2 className="font-display text-xl font-semibold text-surface-900 mb-1">
               Professional background
@@ -377,8 +442,8 @@ export function OnboardingWizard({ userName }: Props) {
           </div>
         )}
 
-        {/* Step 6: Confirmation */}
-        {step === 6 && (
+        {/* Step 7: Confirmation */}
+        {step === 7 && (
           <div>
             <h2 className="font-display text-xl font-semibold text-surface-900 mb-1">
               Looking good!
@@ -411,6 +476,18 @@ export function OnboardingWizard({ userName }: Props) {
                 <div className="p-4 bg-surface-50 rounded-xl">
                   <p className="font-medium text-surface-700 mb-1">Location</p>
                   <p className="text-surface-600">{geography || 'Not specified'} · {timezone}</p>
+                </div>
+              )}
+              {funActivities.length > 0 && (
+                <div className="p-4 bg-surface-50 rounded-xl">
+                  <p className="font-medium text-surface-700 mb-2">Fun & Hobbies</p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {funActivities.map(a => (
+                      <span key={a} className="px-2.5 py-1 bg-accent-purple/10 text-accent-purple rounded-full text-xs font-medium">
+                        {a}
+                      </span>
+                    ))}
+                  </div>
                 </div>
               )}
               {(linkedinText || resumeFile) && (
