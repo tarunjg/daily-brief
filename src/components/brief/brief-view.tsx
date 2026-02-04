@@ -125,7 +125,7 @@ export function BriefView({ items, digestId }: Props) {
           item={reflectingItem}
           onClose={() => setReflectingItemId(null)}
           onSaved={(itemId) => {
-            setReflectedItems(prev => new Set([...prev, itemId]));
+            setReflectedItems(prev => new Set(Array.from(prev).concat(itemId)));
             setReflectingItemId(null);
           }}
         />

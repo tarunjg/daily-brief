@@ -80,7 +80,7 @@ export default async function BriefPage() {
             <div className="mt-10 text-center">
               <form action="/api/export" method="POST">
                 <button type="submit" className="btn-secondary">
-                  Export reflections to Google Doc
+                  Open my Google Doc of learnings
                 </button>
               </form>
             </div>

@@ -22,6 +22,11 @@ type DocsRequest = {
   };
 };
 
+const BRAND_COLOR = { red: 0.047, green: 0.553, blue: 0.914 }; // #0c8de9
+const TEXT_DARK = { red: 0.067, green: 0.078, blue: 0.094 }; // #111827
+const TEXT_MUTED = { red: 0.42, green: 0.45, blue: 0.5 }; // #6b7280
+const FONT_FAMILY = 'Inter';
+
 /**
  * Get an authenticated Google Docs client for a user.
  */
@@ -65,9 +70,11 @@ export async function createLearningLogDoc(
 ): Promise<string> {
   const docs = getDocsClient(accessToken, refreshToken);
 
+  const titleText = `${userName}'s Learning Log`;
+  const introText = 'This document is automatically updated with your daily reflections from your Personal Daily Brief.';
   const doc = await docs.documents.create({
     requestBody: {
-      title: `${userName}'s Learning Log`,
+      title: titleText,
     },
   });
 
@@ -78,14 +85,38 @@ export async function createLearningLogDoc(
     {
       insertText: {
         location: { index: 1 },
-        text: `${userName}'s Learning Log\n\nThis document is automatically updated with your daily reflections from your Personal Daily Brief.\n\n`,
+        text: `${titleText}\n\n${introText}\n\n`,
       },
     },
     {
       updateParagraphStyle: {
-        range: { startIndex: 1, endIndex: userName.length + "'s Learning Log".length + 2 },
+        range: { startIndex: 1, endIndex: titleText.length + 2 },
         paragraphStyle: { namedStyleType: 'HEADING_1' },
         fields: 'namedStyleType',
+      },
+    },
+    {
+      updateTextStyle: {
+        range: { startIndex: 1, endIndex: titleText.length + 2 },
+        textStyle: {
+          foregroundColor: { color: { rgbColor: BRAND_COLOR } },
+          weightedFontFamily: { fontFamily: FONT_FAMILY },
+          bold: true,
+        },
+        fields: 'foregroundColor,weightedFontFamily,bold',
+      },
+    },
+    {
+      updateTextStyle: {
+        range: {
+          startIndex: titleText.length + 2,
+          endIndex: titleText.length + 2 + 2 + introText.length,
+        },
+        textStyle: {
+          foregroundColor: { color: { rgbColor: TEXT_MUTED } },
+          weightedFontFamily: { fontFamily: FONT_FAMILY },
+        },
+        fields: 'foregroundColor,weightedFontFamily',
       },
     },
   ];
@@ -166,7 +197,7 @@ export async function appendReflectionsToDoc(userId: string): Promise<{ exported
 
   const requests: any[] = [];
 
-  for (const [dateStr, dateNotes] of notesByDate) {
+  for (const [dateStr, dateNotes] of Array.from(notesByDate.entries())) {
     const dateHeading = `\n${formatDate(dateStr)}\n`;
     requests.push({
       insertText: {
@@ -182,6 +213,17 @@ export async function appendReflectionsToDoc(userId: string): Promise<{ exported
         range: { startIndex: headingStart, endIndex: headingEnd - 1 },
         paragraphStyle: { namedStyleType: 'HEADING_2' },
         fields: 'namedStyleType',
+      },
+    });
+    requests.push({
+      updateTextStyle: {
+        range: { startIndex: headingStart, endIndex: headingEnd - 1 },
+        textStyle: {
+          foregroundColor: { color: { rgbColor: BRAND_COLOR } },
+          weightedFontFamily: { fontFamily: FONT_FAMILY },
+          bold: true,
+        },
+        fields: 'foregroundColor,weightedFontFamily,bold',
       },
     });
     insertIndex += dateHeading.length;
@@ -200,6 +242,17 @@ export async function appendReflectionsToDoc(userId: string): Promise<{ exported
           range: { startIndex: insertIndex + 1, endIndex: insertIndex + titleText.length - 1 },
           paragraphStyle: { namedStyleType: 'HEADING_3' },
           fields: 'namedStyleType',
+        },
+      });
+      requests.push({
+        updateTextStyle: {
+          range: { startIndex: insertIndex + 1, endIndex: insertIndex + titleText.length - 1 },
+          textStyle: {
+            foregroundColor: { color: { rgbColor: TEXT_DARK } },
+            weightedFontFamily: { fontFamily: FONT_FAMILY },
+            bold: true,
+          },
+          fields: 'foregroundColor,weightedFontFamily,bold',
         },
       });
       insertIndex += titleText.length;
@@ -239,8 +292,12 @@ export async function appendReflectionsToDoc(userId: string): Promise<{ exported
       requests.push({
         updateTextStyle: {
           range: { startIndex: insertIndex, endIndex: insertIndex + summaryText.length - 1 },
-          textStyle: { italic: true },
-          fields: 'italic',
+          textStyle: {
+            italic: true,
+            foregroundColor: { color: { rgbColor: TEXT_MUTED } },
+            weightedFontFamily: { fontFamily: FONT_FAMILY },
+          },
+          fields: 'italic,foregroundColor,weightedFontFamily',
         },
       });
       insertIndex += summaryText.length;
@@ -259,8 +316,22 @@ export async function appendReflectionsToDoc(userId: string): Promise<{ exported
         requests.push({
           updateTextStyle: {
             range: { startIndex: insertIndex + 1, endIndex: insertIndex + 15 },
-            textStyle: { bold: true },
-            fields: 'bold',
+            textStyle: {
+              bold: true,
+              foregroundColor: { color: { rgbColor: BRAND_COLOR } },
+              weightedFontFamily: { fontFamily: FONT_FAMILY },
+            },
+            fields: 'bold,foregroundColor,weightedFontFamily',
+          },
+        });
+        requests.push({
+          updateTextStyle: {
+            range: { startIndex: insertIndex + 15, endIndex: insertIndex + reflectionText.length - 1 },
+            textStyle: {
+              foregroundColor: { color: { rgbColor: TEXT_DARK } },
+              weightedFontFamily: { fontFamily: FONT_FAMILY },
+            },
+            fields: 'foregroundColor,weightedFontFamily',
           },
         });
         insertIndex += reflectionText.length;
