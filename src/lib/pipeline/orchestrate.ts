@@ -1,6 +1,6 @@
 import { db } from '@/lib/db';
 import { users, userPreferences, digests, digestItems, articles } from '@/lib/db/schema';
-import { eq } from 'drizzle-orm';
+import { and, eq, desc, inArray } from 'drizzle-orm';
 import { runIngestionPipeline } from './ingest';
 import { rankArticlesForUser, semanticDedup, buildProfilePayload } from './ranking';
 import { generateBrief } from '@/lib/prompts/generate';
@@ -20,7 +20,17 @@ import type { ArticlePayload } from '@/types';
  * 5. Store digest + items
  * 6. Send email (if enabled)
  */
-export async function generateBriefForUser(userId: string): Promise<string> {
+const INGESTION_MIN_INTERVAL_MS = 30 * 60 * 1000;
+
+interface GenerateBriefOptions {
+  skipIngestion?: boolean;
+  forceIngestion?: boolean;
+}
+
+export async function generateBriefForUser(
+  userId: string,
+  options: GenerateBriefOptions = {},
+): Promise<string> {
   const startTime = Date.now();
   console.log(`[Pipeline] Starting brief generation for user ${userId}`);
 
@@ -36,13 +46,19 @@ export async function generateBriefForUser(userId: string): Promise<string> {
 
   const today = new Date().toISOString().split('T')[0];
 
-  // Check if brief already exists for today
-  const existingDigest = await db.select()
+  // If a ready digest already exists for today, reuse it.
+  const [existingReadyDigest] = await db.select()
     .from(digests)
-    .where(eq(digests.userId, userId))
+    .where(and(
+      eq(digests.userId, userId),
+      eq(digests.digestDate, today),
+      eq(digests.status, 'ready'),
+    ))
     .limit(1);
-  // In production, also filter by digestDate = today
-  // For now, we allow regeneration
+  if (existingReadyDigest) {
+    console.log(`[Pipeline] Reusing existing digest for ${userId} (${today})`);
+    return existingReadyDigest.id;
+  }
 
   // Create digest record
   const [digest] = await db.insert(digests).values({
@@ -52,8 +68,25 @@ export async function generateBriefForUser(userId: string): Promise<string> {
   }).returning();
 
   try {
-    // Step 1: Ingest (if needed — in production, this runs on a separate schedule)
-    await runIngestionPipeline(prefs.interests || []);
+    // Step 1: Ingest (skip if recently ingested or explicitly disabled)
+    if (!options.skipIngestion) {
+      let shouldIngest = true;
+      if (!options.forceIngestion) {
+        const [latestArticle] = await db.select({ createdAt: articles.createdAt })
+          .from(articles)
+          .orderBy(desc(articles.createdAt))
+          .limit(1);
+        if (latestArticle?.createdAt) {
+          const ageMs = Date.now() - new Date(latestArticle.createdAt).getTime();
+          shouldIngest = ageMs > INGESTION_MIN_INTERVAL_MS;
+        }
+      }
+      if (shouldIngest) {
+        await runIngestionPipeline(prefs.interests || []);
+      } else {
+        console.log('[Pipeline] Skipping ingestion (recently ingested)');
+      }
+    }
 
     // Step 2: Rank articles for this user
     const ranked = await rankArticlesForUser(userId, 20);
@@ -80,36 +113,31 @@ export async function generateBriefForUser(userId: string): Promise<string> {
     const brief = await generateBrief(profile, articlePayloads, today);
 
     // Step 6: Store digest items
+    const sourceUrls = articlePayloads.map(a => a.sourceUrl);
+    const articleRows = sourceUrls.length === 0 ? [] : await db.select({
+      id: articles.id,
+      sourceUrl: articles.sourceUrl,
+    })
+      .from(articles)
+      .where(inArray(articles.sourceUrl, sourceUrls));
+    const articleIdByUrl = new Map(articleRows.map(row => [row.sourceUrl, row.id]));
+
     for (const item of brief.items) {
-      // Find or create the article record
-      const matchingPayload = articlePayloads.find(a =>
-        item.sourceLinks.some(link => link.url === a.sourceUrl)
-      );
+      const matchingLink = item.sourceLinks.find(link => articleIdByUrl.has(link.url));
+      const articleId = matchingLink ? articleIdByUrl.get(matchingLink.url) : undefined;
+      if (!articleId) continue;
 
-      let articleId: string;
-      if (matchingPayload) {
-        const [existing] = await db.select({ id: articles.id })
-          .from(articles)
-          .where(eq(articles.sourceUrl, matchingPayload.sourceUrl))
-          .limit(1);
-        articleId = existing?.id || '';
-      } else {
-        articleId = '';
-      }
-
-      if (articleId) {
-        await db.insert(digestItems).values({
-          digestId: digest.id,
-          articleId,
-          position: item.position,
-          title: item.title,
-          summary: item.summary,
-          whyItMatters: item.whyItMatters,
-          relevanceScore: item.relevanceScore,
-          topics: item.topics,
-          sourceLinks: item.sourceLinks,
-        });
-      }
+      await db.insert(digestItems).values({
+        digestId: digest.id,
+        articleId,
+        position: item.position,
+        title: item.title,
+        summary: item.summary,
+        whyItMatters: item.whyItMatters,
+        relevanceScore: item.relevanceScore,
+        topics: item.topics,
+        sourceLinks: item.sourceLinks,
+      });
     }
 
     // Update digest status
@@ -155,9 +183,28 @@ export async function generateBriefsForAllUsers(): Promise<void> {
 
   console.log(`[Pipeline] Generating briefs for ${allUsers.length} users`);
 
+  if (allUsers.length === 0) return;
+
+  // Run ingestion once for the union of all user interests.
+  const userIds = allUsers.map(u => u.id);
+  const allPrefs = await db.select({ interests: userPreferences.interests })
+    .from(userPreferences)
+    .where(inArray(userPreferences.userId, userIds));
+  const interestSet = new Set<string>();
+  for (const prefs of allPrefs) {
+    (prefs.interests || []).forEach(interest => interestSet.add(interest));
+  }
+  const combinedInterests = interestSet.size > 0 ? Array.from(interestSet) : undefined;
+
+  try {
+    await runIngestionPipeline(combinedInterests);
+  } catch (error) {
+    console.error('[Pipeline] Ingestion failed before cron run:', error);
+  }
+
   for (const user of allUsers) {
     try {
-      await generateBriefForUser(user.id);
+      await generateBriefForUser(user.id, { skipIngestion: true });
     } catch (error) {
       console.error(`[Pipeline] Skipping user ${user.email}:`, error);
     }
