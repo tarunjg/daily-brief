@@ -1,8 +1,9 @@
 'use client';
 
 import { useState } from 'react';
-import { ExternalLink, MessageSquare, Check } from 'lucide-react';
+import { ExternalLink, MessageSquare, Check, Mic } from 'lucide-react';
 import { ReflectModal } from '@/components/reflection/reflect-modal';
+import { VoiceNoteModal } from '@/components/voice/voice-note-modal';
 
 interface BriefItem {
   id: string;
@@ -27,11 +28,29 @@ export function BriefView({ items, digestId }: Props) {
   const [reflectedItems, setReflectedItems] = useState<Set<string>>(
     new Set(items.filter(i => i.hasReflection).map(i => i.id))
   );
+  const [showVoiceNote, setShowVoiceNote] = useState(false);
 
   const reflectingItem = items.find(i => i.id === reflectingItemId);
 
   return (
     <div className="space-y-4">
+      {/* Quick Voice Note Button */}
+      <button
+        onClick={() => setShowVoiceNote(true)}
+        className="w-full flex items-center justify-center gap-2 py-4 px-4 mb-4
+                  bg-gradient-to-r from-brand-50 to-accent-purple/10
+                  border border-brand-200 rounded-xl
+                  text-brand-700 font-medium text-sm
+                  hover:from-brand-100 hover:to-accent-purple/20
+                  transition-all duration-200 group"
+      >
+        <div className="w-10 h-10 rounded-full bg-brand-600 flex items-center justify-center
+                      group-hover:bg-brand-700 transition-colors shadow-sm">
+          <Mic className="w-5 h-5 text-white" />
+        </div>
+        <span>Record a quick voice note</span>
+      </button>
+
       {items.map((item, i) => (
         <article
           key={item.id}
@@ -128,6 +147,14 @@ export function BriefView({ items, digestId }: Props) {
             setReflectedItems(prev => new Set([...prev, itemId]));
             setReflectingItemId(null);
           }}
+        />
+      )}
+
+      {/* Voice Note Modal */}
+      {showVoiceNote && (
+        <VoiceNoteModal
+          onClose={() => setShowVoiceNote(false)}
+          digestId={digestId}
         />
       )}
     </div>

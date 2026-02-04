@@ -14,7 +14,7 @@ export function AppHeader() {
       <div className="max-w-3xl mx-auto px-4 sm:px-6">
         <div className="flex items-center justify-between h-14">
           {/* Logo */}
-          <Link href="/brief" className="flex items-center gap-2.5 group">
+          <Link href="/" className="flex items-center gap-2.5 group">
             <div className="w-8 h-8 rounded-lg bg-brand-600 flex items-center justify-center
                           group-hover:bg-brand-700 transition-colors">
               <BookOpen className="w-4 h-4 text-white" />
