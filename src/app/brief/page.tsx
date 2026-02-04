@@ -6,7 +6,8 @@ import { AppHeader } from '@/components/layout/app-header';
 import { Footer } from '@/components/layout/footer';
 import { BriefView } from '@/components/brief/brief-view';
 import { formatDate } from '@/lib/utils';
-import { BookOpen, RefreshCw, ChevronLeft, ChevronRight, FileText, ExternalLink } from 'lucide-react';
+import { BookOpen, RefreshCw, ChevronLeft, ChevronRight, FileText, ExternalLink, Play, Volume2 } from 'lucide-react';
+import { AudioPlayer } from '@/components/brief/audio-player';
 import Link from 'next/link';
 
 interface Props {
@@ -159,6 +160,22 @@ export default async function BriefPage({ searchParams }: Props) {
               </p>
             </div>
 
+            {/* Audio Player */}
+            <AudioPlayer
+              digestId={currentDigest.id}
+              audioUrl={currentDigest.audioUrl}
+              briefDate={currentDigest.digestDate}
+            />
+
+            {/* Opening narrative */}
+            {currentDigest.opening && (
+              <div className="mb-6 p-5 bg-white rounded-2xl border border-surface-200 shadow-card">
+                <p className="text-surface-700 leading-relaxed italic">
+                  {currentDigest.opening}
+                </p>
+              </div>
+            )}
+
             {/* Items */}
             <BriefView
               items={items.map(item => ({
@@ -177,6 +194,15 @@ export default async function BriefPage({ searchParams }: Props) {
               }))}
               digestId={currentDigest.id}
             />
+
+            {/* Closing narrative */}
+            {currentDigest.closing && (
+              <div className="mt-6 p-5 bg-white rounded-2xl border border-surface-200 shadow-card">
+                <p className="text-surface-700 leading-relaxed italic">
+                  {currentDigest.closing}
+                </p>
+              </div>
+            )}
 
             {/* Bottom action buttons */}
             <div className="mt-10 flex flex-col sm:flex-row items-center justify-center gap-3">

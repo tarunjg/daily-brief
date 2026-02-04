@@ -144,6 +144,9 @@ export async function generateBriefForUser(
     await db.update(digests).set({
       status: 'ready',
       totalWordCount: brief.totalWordCount,
+      narrativeThread: brief.narrativeThread || null,
+      opening: brief.opening || null,
+      closing: brief.closing || null,
       generatedAt: new Date(),
       updatedAt: new Date(),
     }).where(eq(digests.id, digest.id));

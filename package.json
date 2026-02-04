@@ -17,6 +17,7 @@
     "@extractus/article-extractor": "^8.0.0",
     "@google-cloud/storage": "^7.14.0",
     "@supabase/supabase-js": "^2.47.0",
+    "@vercel/blob": "^2.0.1",
     "clsx": "^2.1.1",
     "crypto-js": "^4.2.0",
     "date-fns": "^4.1.0",

@@ -59,6 +59,9 @@ export interface SourceLink {
 export interface GeneratedBrief {
   briefDate: string;
   totalWordCount: number;
+  narrativeThread?: string;
+  opening?: string;
+  closing?: string;
   items: DigestItem[];
 }
 
