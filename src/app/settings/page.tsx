@@ -3,6 +3,7 @@ import { db } from '@/lib/db';
 import { users, userPreferences } from '@/lib/db/schema';
 import { eq } from 'drizzle-orm';
 import { AppHeader } from '@/components/layout/app-header';
+import { Footer } from '@/components/layout/footer';
 import { SettingsForm } from '@/components/settings/settings-form';
 import type { GoalEntry } from '@/types';
 
@@ -24,9 +25,9 @@ export default async function SettingsPage() {
     .limit(1);
 
   return (
-    <div className="min-h-screen bg-surface-50">
+    <div className="min-h-screen bg-surface-50 flex flex-col">
       <AppHeader />
-      <main className="max-w-2xl mx-auto px-4 sm:px-6 py-8">
+      <main className="flex-1 max-w-2xl mx-auto px-4 sm:px-6 py-8 w-full">
         <h1 className="font-display text-display-sm text-surface-900 mb-1">Settings</h1>
         <p className="text-surface-500 text-sm mb-8">
           Update your preferences to refine your daily brief.
@@ -46,6 +47,8 @@ export default async function SettingsPage() {
           }}
         />
       </main>
+
+      <Footer />
     </div>
   );
 }

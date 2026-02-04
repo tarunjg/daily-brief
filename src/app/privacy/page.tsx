@@ -4,8 +4,8 @@ import { Logo } from '@/components/ui/logo';
 import { Footer } from '@/components/layout/footer';
 
 export const metadata = {
-  title: 'Privacy Policy | My My Daily Briefinging',
-  description: 'How we handle your data at My My Daily Briefinging',
+  title: 'Privacy Policy | My Daily Briefing',
+  description: 'How we handle your data at My Daily Briefing',
 };
 
 export default function PrivacyPage() {

@@ -4,8 +4,8 @@ import { Logo } from '@/components/ui/logo';
 import { Footer } from '@/components/layout/footer';
 
 export const metadata = {
-  title: 'Terms of Service | My My Daily Briefinging',
-  description: 'Terms of service for using My My Daily Briefinging',
+  title: 'Terms of Service | My Daily Briefing',
+  description: 'Terms of service for using My Daily Briefing',
 };
 
 export default function TermsPage() {

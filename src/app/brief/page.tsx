@@ -3,6 +3,7 @@ import { db } from '@/lib/db';
 import { digests, digestItems, notes } from '@/lib/db/schema';
 import { eq, desc, and } from 'drizzle-orm';
 import { AppHeader } from '@/components/layout/app-header';
+import { Footer } from '@/components/layout/footer';
 import { BriefView } from '@/components/brief/brief-view';
 import { formatDate } from '@/lib/utils';
 import { BookOpen, RefreshCw } from 'lucide-react';
@@ -43,10 +44,10 @@ export default async function BriefPage() {
   const notesByItemId = new Map(userNotes.map(n => [n.digestItemId, n]));
 
   return (
-    <div className="min-h-screen bg-surface-50">
+    <div className="min-h-screen bg-surface-50 flex flex-col">
       <AppHeader />
 
-      <main className="max-w-3xl mx-auto px-4 sm:px-6 py-8">
+      <main className="flex-1 max-w-3xl mx-auto px-4 sm:px-6 py-8 w-full">
         {latestDigest ? (
           <>
             {/* Brief header */}
@@ -105,6 +106,8 @@ export default async function BriefPage() {
           </div>
         )}
       </main>
+
+      <Footer />
     </div>
   );
 }

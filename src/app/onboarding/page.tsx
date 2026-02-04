@@ -1,6 +1,7 @@
 import { requireAuth } from '@/lib/auth';
 import { redirect } from 'next/navigation';
 import { OnboardingWizard } from '@/components/onboarding/wizard';
+import { Footer } from '@/components/layout/footer';
 
 export default async function OnboardingPage() {
   const session = await requireAuth();
@@ -11,8 +12,11 @@ export default async function OnboardingPage() {
   }
 
   return (
-    <div className="min-h-screen bg-surface-50">
-      <OnboardingWizard userName={session.user.name} />
+    <div className="min-h-screen bg-surface-50 flex flex-col">
+      <div className="flex-1">
+        <OnboardingWizard userName={session.user.name} />
+      </div>
+      <Footer />
     </div>
   );
 }
