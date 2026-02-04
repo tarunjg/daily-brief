@@ -8,14 +8,19 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
+function getEncryptionKey(): string {
+  // NOTE: Fallback exists for local/dev convenience. It is not safe for production.
+  return process.env.NEXTAUTH_SECRET || 'fallback-key';
+}
+
 /** Encrypt sensitive data at rest */
 export function encrypt(text: string): string {
-  const key = process.env.NEXTAUTH_SECRET || 'fallback-key';
+  const key = getEncryptionKey();
   return CryptoJS.AES.encrypt(text, key).toString();
 }
 
 export function decrypt(ciphertext: string): string {
-  const key = process.env.NEXTAUTH_SECRET || 'fallback-key';
+  const key = getEncryptionKey();
   const bytes = CryptoJS.AES.decrypt(ciphertext, key);
   return bytes.toString(CryptoJS.enc.Utf8);
 }
