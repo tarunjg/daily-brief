@@ -46,6 +46,16 @@ export const RSS_SOURCES: RSSSource[] = [
   { name: 'Google News - Top', url: 'https://news.google.com/rss', category: 'General', tier: 5 },
   { name: 'Google News - Technology', url: 'https://news.google.com/rss/topics/CAAqJggKIiBDQkFTRWdvSUwyMHZNRGRqTVhZU0FtVnVHZ0pWVXlnQVAB', category: 'Technology', tier: 5 },
   { name: 'Google News - Business', url: 'https://news.google.com/rss/topics/CAAqJggKIiBDQkFTRWdvSUwyMHZNRGx6TVdZU0FtVnVHZ0pWVXlnQVAB', category: 'Business', tier: 5 },
+
+  // ── Podcasts ──
+  { name: 'HBR IdeaCast', url: 'https://feeds.harvardbusiness.org/harvardbusiness/ideacast', category: 'Leadership', tier: 3, type: 'podcast' },
+  { name: 'a]6z Podcast', url: 'https://a16z.simplecast.com/rss', category: 'Technology', tier: 2, type: 'podcast' },
+  { name: 'The Vergecast', url: 'https://feeds.megaphone.fm/vergecast', category: 'Technology', tier: 2, type: 'podcast' },
+  { name: 'Lex Fridman Podcast', url: 'https://lexfridman.com/feed/podcast/', category: 'AI/ML', tier: 3, type: 'podcast' },
+  { name: 'Acquired', url: 'https://acquired.libsyn.com/rss', category: 'Business', tier: 2, type: 'podcast' },
+  { name: 'All-In Podcast', url: 'https://feeds.megaphone.fm/all-in-with-chamath-jason-sacks-friedberg', category: 'Technology', tier: 2, type: 'podcast' },
+  { name: 'How I Built This', url: 'https://feeds.npr.org/510313/podcast.xml', category: 'Business', tier: 2, type: 'podcast' },
+  { name: 'Masters of Scale', url: 'https://rss.art19.com/masters-of-scale', category: 'Leadership', tier: 3, type: 'podcast' },
 ];
 
 /**

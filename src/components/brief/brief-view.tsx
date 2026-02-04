@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { ExternalLink, MessageSquare, Check, ThumbsUp, ThumbsDown, Heart, HeartOff } from 'lucide-react';
+import { ExternalLink, MessageSquare, Check, ThumbsUp, ThumbsDown, Heart, Headphones } from 'lucide-react';
 import { ReflectModal } from '@/components/reflection/reflect-modal';
 import { toast } from 'sonner';
 
@@ -13,11 +13,45 @@ interface BriefItem {
   whyItMatters: string;
   relevanceScore: number | null;
   topics: string[];
-  sourceLinks: { url: string; label: string }[];
+  sourceLinks: { url: string; label: string; type?: string }[];
   hasReflection: boolean;
   reflectionText: string | null;
   feedback?: 'more' | 'less' | null;
   isFavorite?: boolean;
+}
+
+// Helper to detect podcast links by URL patterns and label
+function isPodcastLink(link: { url: string; label: string; type?: string }): boolean {
+  if (link.type === 'podcast') return true;
+
+  const podcastPatterns = [
+    /podcast/i,
+    /\.fm\//,
+    /simplecast\.com/i,
+    /libsyn\.com/i,
+    /megaphone\.fm/i,
+    /anchor\.fm/i,
+    /spotify\.com\/episode/i,
+    /apple\.com\/podcast/i,
+    /overcast\.fm/i,
+    /pocketcasts/i,
+    /art19\.com/i,
+  ];
+
+  const labelPatterns = [
+    /podcast/i,
+    /ideacast/i,
+    /vergecast/i,
+    /acquired/i,
+    /all-in/i,
+    /how i built/i,
+    /masters of scale/i,
+    /lex fridman/i,
+    /a16z/i,
+  ];
+
+  return podcastPatterns.some(p => p.test(link.url)) ||
+         labelPatterns.some(p => p.test(link.label));
 }
 
 interface Props {
@@ -125,19 +159,26 @@ export function BriefView({ items, digestId }: Props) {
           <div className="flex flex-col gap-3">
             {/* Source links */}
             <div className="flex flex-wrap gap-3">
-              {item.sourceLinks.map((link, j) => (
-                <a
-                  key={j}
-                  href={link.url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1 text-xs font-medium
-                           text-brand-600 hover:text-brand-800 transition-colors"
-                >
-                  {link.label}
-                  <ExternalLink className="w-3 h-3" />
-                </a>
-              ))}
+              {item.sourceLinks.map((link, j) => {
+                const isPodcast = isPodcastLink(link);
+                return (
+                  <a
+                    key={j}
+                    href={link.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className={`inline-flex items-center gap-1 text-xs font-medium transition-colors ${
+                      isPodcast
+                        ? 'text-purple-600 hover:text-purple-800'
+                        : 'text-brand-600 hover:text-brand-800'
+                    }`}
+                  >
+                    {isPodcast && <Headphones className="w-3 h-3" />}
+                    {link.label}
+                    {!isPodcast && <ExternalLink className="w-3 h-3" />}
+                  </a>
+                );
+              })}
             </div>
 
             {/* Action buttons */}

@@ -11,7 +11,8 @@ import {
   Loader2,
   ChevronRight,
   MessageSquare,
-  Calendar
+  Calendar,
+  Headphones
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -21,8 +22,42 @@ interface Favorite {
   title: string;
   summary: string;
   topics: string[];
-  sourceLinks: { url: string; label: string }[];
+  sourceLinks: { url: string; label: string; type?: string }[];
   createdAt: string;
+}
+
+// Helper to detect podcast links by URL patterns and label
+function isPodcastLink(link: { url: string; label: string; type?: string }): boolean {
+  if (link.type === 'podcast') return true;
+
+  const podcastPatterns = [
+    /podcast/i,
+    /\.fm\//,
+    /simplecast\.com/i,
+    /libsyn\.com/i,
+    /megaphone\.fm/i,
+    /anchor\.fm/i,
+    /spotify\.com\/episode/i,
+    /apple\.com\/podcast/i,
+    /overcast\.fm/i,
+    /pocketcasts/i,
+    /art19\.com/i,
+  ];
+
+  const labelPatterns = [
+    /podcast/i,
+    /ideacast/i,
+    /vergecast/i,
+    /acquired/i,
+    /all-in/i,
+    /how i built/i,
+    /masters of scale/i,
+    /lex fridman/i,
+    /a16z/i,
+  ];
+
+  return podcastPatterns.some(p => p.test(link.url)) ||
+         labelPatterns.some(p => p.test(link.label));
 }
 
 interface RecentNote {
@@ -201,18 +236,34 @@ export function Dashboard({ userName, favorites, recentNotes, googleDocUrl, toda
                     ))}
                   </div>
                   <div className="flex gap-2">
-                    {fav.sourceLinks?.slice(0, 1).map((link, j) => (
-                      <a
-                        key={j}
-                        href={link.url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-xs text-brand-600 hover:text-brand-800 inline-flex items-center gap-1"
-                      >
-                        Read
-                        <ExternalLink className="w-3 h-3" />
-                      </a>
-                    ))}
+                    {fav.sourceLinks?.slice(0, 1).map((link, j) => {
+                      const isPodcast = isPodcastLink(link);
+                      return (
+                        <a
+                          key={j}
+                          href={link.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className={`text-xs inline-flex items-center gap-1 ${
+                            isPodcast
+                              ? 'text-purple-600 hover:text-purple-800'
+                              : 'text-brand-600 hover:text-brand-800'
+                          }`}
+                        >
+                          {isPodcast ? (
+                            <>
+                              <Headphones className="w-3 h-3" />
+                              Listen
+                            </>
+                          ) : (
+                            <>
+                              Read
+                              <ExternalLink className="w-3 h-3" />
+                            </>
+                          )}
+                        </a>
+                      );
+                    })}
                   </div>
                 </div>
               </div>

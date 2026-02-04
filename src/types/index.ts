@@ -53,6 +53,7 @@ export interface DigestItem {
 export interface SourceLink {
   url: string;
   label: string;
+  type?: SourceType;
 }
 
 export interface GeneratedBrief {
@@ -153,9 +154,12 @@ export interface OnboardingData {
 
 // ─── RSS Sources ───
 
+export type SourceType = 'article' | 'podcast';
+
 export interface RSSSource {
   name: string;
   url: string;
   category: string;
   tier: number;
+  type?: SourceType;
 }
