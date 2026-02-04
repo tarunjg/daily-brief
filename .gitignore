@@ -39,3 +39,4 @@ Thumbs.db
 
 # Drizzle
 drizzle/
+.env*.local
