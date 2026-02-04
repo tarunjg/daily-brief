@@ -7,14 +7,23 @@ import { eq, asc } from 'drizzle-orm';
 import OpenAI from 'openai';
 import { createClient } from '@supabase/supabase-js';
 
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
+// Lazy-initialize clients to avoid build-time errors when env vars aren't set
+function getOpenAIClient() {
+  return new OpenAI({
+    apiKey: process.env.OPENAI_API_KEY,
+  });
+}
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
+function getSupabaseClient() {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+  if (!url || !key) {
+    throw new Error('Supabase configuration missing');
+  }
+
+  return createClient(url, key);
+}
 
 /**
  * Convert the brief content into a natural spoken script
@@ -108,6 +117,10 @@ export async function POST(req: NextRequest) {
 
     // Build the script
     const script = buildAudioScript(digest, items);
+
+    // Initialize clients
+    const openai = getOpenAIClient();
+    const supabase = getSupabaseClient();
 
     // Generate audio using OpenAI TTS
     const mp3Response = await openai.audio.speech.create({
