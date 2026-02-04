@@ -5,11 +5,16 @@ import { db } from '@/lib/db';
 import { digests, digestItems } from '@/lib/db/schema';
 import { eq, asc } from 'drizzle-orm';
 import OpenAI from 'openai';
-import { put } from '@vercel/blob';
+import { createClient } from '@supabase/supabase-js';
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
+
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!
+);
 
 /**
  * Convert the brief content into a natural spoken script
@@ -115,19 +120,34 @@ export async function POST(req: NextRequest) {
     // Get the audio buffer
     const audioBuffer = Buffer.from(await mp3Response.arrayBuffer());
 
-    // Upload to Vercel Blob
-    const blob = await put(`audio/brief-${digestId}.mp3`, audioBuffer, {
-      access: 'public',
-      contentType: 'audio/mpeg',
-    });
+    // Upload to Supabase Storage
+    const fileName = `brief-${digestId}.mp3`;
+    const { data, error: uploadError } = await supabase.storage
+      .from('audio')
+      .upload(fileName, audioBuffer, {
+        contentType: 'audio/mpeg',
+        upsert: true,
+      });
+
+    if (uploadError) {
+      console.error('Supabase upload error:', uploadError);
+      throw new Error('Failed to upload audio');
+    }
+
+    // Get public URL
+    const { data: urlData } = supabase.storage
+      .from('audio')
+      .getPublicUrl(fileName);
+
+    const audioUrl = urlData.publicUrl;
 
     // Update digest with audio URL
     await db.update(digests).set({
-      audioUrl: blob.url,
+      audioUrl,
       updatedAt: new Date(),
     }).where(eq(digests.id, digestId));
 
-    return NextResponse.json({ audioUrl: blob.url });
+    return NextResponse.json({ audioUrl });
   } catch (error) {
     console.error('Audio generation error:', error);
     return NextResponse.json(
