@@ -4,19 +4,105 @@ import Link from 'next/link';
 import { Mic, FileText, Sparkles, BookOpen } from 'lucide-react';
 import { Logo } from '@/components/ui/logo';
 import { Footer } from '@/components/layout/footer';
+import { AppHeader } from '@/components/layout/app-header';
+import { Dashboard } from '@/components/home/dashboard';
+import { db } from '@/lib/db';
+import { users, favoriteArticles, digestItems, notes, digests } from '@/lib/db/schema';
+import { eq, desc, and } from 'drizzle-orm';
 
 export default async function HomePage() {
   const session = await getSession();
 
-  // If authenticated, redirect to brief or onboarding
-  if (session?.user) {
-    if (session.user.onboardingCompleted) {
-      redirect('/brief');
-    } else {
-      redirect('/onboarding');
-    }
+  // If authenticated but not onboarded, redirect to onboarding
+  if (session?.user && !session.user.onboardingCompleted) {
+    redirect('/onboarding');
   }
 
+  // Show dashboard for authenticated users
+  if (session?.user) {
+    const userId = session.user.id;
+
+    // Get user's Google Doc ID
+    const [user] = await db.select({ googleDocId: users.googleDocId })
+      .from(users)
+      .where(eq(users.id, userId))
+      .limit(1);
+
+    // Get favorites
+    const favorites = await db.select({
+      id: favoriteArticles.id,
+      digestItemId: favoriteArticles.digestItemId,
+      title: digestItems.title,
+      summary: digestItems.summary,
+      topics: digestItems.topics,
+      sourceLinks: digestItems.sourceLinks,
+      createdAt: favoriteArticles.createdAt,
+    })
+      .from(favoriteArticles)
+      .innerJoin(digestItems, eq(favoriteArticles.digestItemId, digestItems.id))
+      .where(eq(favoriteArticles.userId, userId))
+      .orderBy(desc(favoriteArticles.createdAt))
+      .limit(10);
+
+    // Get recent notes with item titles
+    const recentNotes = await db.select({
+      id: notes.id,
+      textContent: notes.textContent,
+      createdAt: notes.createdAt,
+      itemTitle: digestItems.title,
+      digestDate: digests.digestDate,
+    })
+      .from(notes)
+      .innerJoin(digestItems, eq(notes.digestItemId, digestItems.id))
+      .innerJoin(digests, eq(digestItems.digestId, digests.id))
+      .where(eq(notes.userId, userId))
+      .orderBy(desc(notes.createdAt))
+      .limit(10);
+
+    // Check if today's brief is available
+    const today = new Date().toISOString().split('T')[0];
+    const [todaysBrief] = await db.select({ id: digests.id })
+      .from(digests)
+      .where(and(
+        eq(digests.userId, userId),
+        eq(digests.status, 'ready'),
+        eq(digests.digestDate, today)
+      ))
+      .limit(1);
+
+    const googleDocUrl = user?.googleDocId
+      ? `https://docs.google.com/document/d/${user.googleDocId}/edit`
+      : null;
+
+    return (
+      <div className="min-h-screen bg-surface-50 flex flex-col">
+        <AppHeader />
+        <main className="flex-1 max-w-3xl mx-auto px-4 sm:px-6 py-8 w-full">
+          <Dashboard
+            userName={session.user.name}
+            favorites={favorites.map(f => ({
+              ...f,
+              topics: f.topics || [],
+              sourceLinks: (f.sourceLinks as any[]) || [],
+              createdAt: f.createdAt.toISOString(),
+            }))}
+            recentNotes={recentNotes.map(n => ({
+              id: n.id,
+              textContent: n.textContent || '',
+              itemTitle: n.itemTitle,
+              createdAt: n.createdAt.toISOString(),
+              digestDate: n.digestDate,
+            }))}
+            googleDocUrl={googleDocUrl}
+            todaysBriefAvailable={!!todaysBrief}
+          />
+        </main>
+        <Footer />
+      </div>
+    );
+  }
+
+  // Show landing page for unauthenticated users
   return (
     <div className="min-h-screen bg-surface-50 flex flex-col">
       {/* Hero */}
