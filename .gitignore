@@ -37,6 +37,6 @@ next-env.d.ts
 .DS_Store
 Thumbs.db
 
-# Drizzle
-drizzle/
+# Drizzle (keep migrations in git for version control)
+# drizzle/
 .env*.local
