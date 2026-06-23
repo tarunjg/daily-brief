@@ -73,22 +73,22 @@ export async function POST(req: NextRequest, { params }: Params) {
   try {
     const draft = await draftOutboundEmail(person, toEmail);
 
-    if (existing) {
-      await db.update(outboundEmails).set({
+    // Upsert so concurrent/double requests can't violate the unique constraint.
+    await db.insert(outboundEmails).values({
+      digestItemId: params.itemId,
+      userId,
+      toEmail: draft.toEmail,
+      subject: draft.subject,
+      body: draft.body,
+    }).onConflictDoUpdate({
+      target: outboundEmails.digestItemId,
+      set: {
         toEmail: draft.toEmail,
         subject: draft.subject,
         body: draft.body,
         updatedAt: new Date(),
-      }).where(eq(outboundEmails.id, existing.id));
-    } else {
-      await db.insert(outboundEmails).values({
-        digestItemId: params.itemId,
-        userId,
-        toEmail: draft.toEmail,
-        subject: draft.subject,
-        body: draft.body,
-      });
-    }
+      },
+    });
 
     return NextResponse.json({ success: true, data: draft });
   } catch (error) {

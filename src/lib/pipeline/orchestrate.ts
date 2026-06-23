@@ -59,14 +59,8 @@ export async function generateBriefForUser(
 
   const today = new Date().toISOString().split('T')[0];
 
-  if (options.force) {
-    // Regenerate from scratch: drop any of today's digests (cascades to items/emails).
-    await db.delete(digests).where(and(
-      eq(digests.userId, userId),
-      eq(digests.digestDate, today),
-    ));
-  } else {
-    // Reuse an existing ready digest for today.
+  // Reuse an existing ready digest for today unless forcing a fresh one.
+  if (!options.force) {
     const [existingReady] = await db.select()
       .from(digests)
       .where(and(
@@ -81,40 +75,51 @@ export async function generateBriefForUser(
     }
   }
 
-  const [digest] = await db.insert(digests).values({
-    userId,
-    digestDate: today,
-    status: 'generating',
-  }).returning();
+  // Generate the full brief BEFORE touching the database. If generation fails
+  // (or a concurrent run is in flight), the existing brief is never wiped.
+  const profile = buildProfilePayload(prefs);
+  const brief = await generateCompanyBrief(profile, today);
 
-  try {
-    const profile = buildProfilePayload(prefs);
-    const brief = await generateCompanyBrief(profile, today);
+  if (brief.aiNews.length === 0 && brief.people.length === 0) {
+    throw new Error('Brief generation returned no items');
+  }
 
-    if (brief.aiNews.length === 0 && brief.people.length === 0) {
-      await db.update(digests).set({ status: 'failed', updatedAt: new Date() }).where(eq(digests.id, digest.id));
-      throw new Error('Brief generation returned no items');
-    }
+  const newsWords = brief.aiNews.reduce(
+    (sum, n) => sum + wordCount(n.summary || '') + wordCount(n.whyItMatters || ''), 0);
+  const peopleWords = brief.people.reduce(
+    (sum, p) => sum + wordCount(p.companyOneLiner || '') + wordCount(p.whyMeet || ''), 0);
+  const totalWords = newsWords + peopleWords;
 
-    // Store AI news bullets.
-    for (const n of brief.aiNews) {
-      await db.insert(digestItems).values({
+  // Persist atomically: replace today's digest + insert all items in ONE transaction,
+  // so items can never reference a digest that a concurrent run deleted.
+  const digestId = await db.transaction(async (tx) => {
+    await tx.delete(digests).where(and(
+      eq(digests.userId, userId),
+      eq(digests.digestDate, today),
+    ));
+
+    const [digest] = await tx.insert(digests).values({
+      userId,
+      digestDate: today,
+      status: 'ready',
+      totalWordCount: totalWords,
+      generatedAt: new Date(),
+    }).returning();
+
+    const itemValues = [
+      ...brief.aiNews.map((n) => ({
         digestId: digest.id,
-        itemType: 'ai_news',
+        itemType: 'ai_news' as const,
         position: n.position,
         title: n.title,
         summary: n.summary,
         whyItMatters: n.whyItMatters,
         topics: n.topics,
         sourceLinks: n.sourceLinks,
-      });
-    }
-
-    // Store people to meet.
-    for (const p of brief.people) {
-      await db.insert(digestItems).values({
+      })),
+      ...brief.people.map((p) => ({
         digestId: digest.id,
-        itemType: 'person',
+        itemType: 'person' as const,
         position: p.position,
         title: p.companyName || p.personName,
         summary: p.companyOneLiner,
@@ -132,41 +137,28 @@ export async function generateBriefForUser(
         candidateEmails: p.candidateEmails,
         linkedinUrl: p.linkedinUrl,
         whyMeet: p.whyMeet,
-      });
+      })),
+    ];
+    if (itemValues.length > 0) {
+      await tx.insert(digestItems).values(itemValues);
     }
-
-    const newsWords = brief.aiNews.reduce(
-      (sum, n) => sum + wordCount(n.summary || '') + wordCount(n.whyItMatters || ''), 0);
-    const peopleWords = brief.people.reduce(
-      (sum, p) => sum + wordCount(p.companyOneLiner || '') + wordCount(p.whyMeet || ''), 0);
-    const totalWords = newsWords + peopleWords;
-
-    await db.update(digests).set({
-      status: 'ready',
-      totalWordCount: totalWords,
-      generatedAt: new Date(),
-      updatedAt: new Date(),
-    }).where(eq(digests.id, digest.id));
-
-    if (user.emailBriefEnabled) {
-      await sendBriefEmail(user.email, {
-        userName: user.name,
-        briefDate: formatDate(today),
-        aiNews: brief.aiNews,
-        people: brief.people,
-        appUrl: process.env.APP_URL || 'http://localhost:3000',
-      });
-    }
-
-    const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
-    console.log(`[Pipeline] Brief generated for ${user.email} in ${elapsed}s (${brief.aiNews.length} news, ${brief.people.length} people)`);
-
     return digest.id;
-  } catch (error) {
-    console.error(`[Pipeline] Failed for user ${userId}:`, error);
-    await db.update(digests).set({ status: 'failed', updatedAt: new Date() }).where(eq(digests.id, digest.id));
-    throw error;
+  });
+
+  if (user.emailBriefEnabled) {
+    await sendBriefEmail(user.email, {
+      userName: user.name,
+      briefDate: formatDate(today),
+      aiNews: brief.aiNews,
+      people: brief.people,
+      appUrl: process.env.APP_URL || 'http://localhost:3000',
+    });
   }
+
+  const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
+  console.log(`[Pipeline] Brief generated for ${user.email} in ${elapsed}s (${brief.aiNews.length} news, ${brief.people.length} people)`);
+
+  return digestId;
 }
 
 /**
