@@ -41,9 +41,12 @@ function buildProfilePayload(prefs: {
  * 4. Store digest + items
  * 5. Send email (if enabled)
  */
-export async function generateBriefForUser(userId: string): Promise<string> {
+export async function generateBriefForUser(
+  userId: string,
+  options: { force?: boolean } = {},
+): Promise<string> {
   const startTime = Date.now();
-  console.log(`[Pipeline] Starting company brief for user ${userId}`);
+  console.log(`[Pipeline] Starting company brief for user ${userId}${options.force ? ' (force)' : ''}`);
 
   const [user] = await db.select().from(users).where(eq(users.id, userId)).limit(1);
   if (!user) throw new Error(`User ${userId} not found`);
@@ -56,18 +59,26 @@ export async function generateBriefForUser(userId: string): Promise<string> {
 
   const today = new Date().toISOString().split('T')[0];
 
-  // Reuse an existing ready digest for today.
-  const [existingReady] = await db.select()
-    .from(digests)
-    .where(and(
+  if (options.force) {
+    // Regenerate from scratch: drop any of today's digests (cascades to items/emails).
+    await db.delete(digests).where(and(
       eq(digests.userId, userId),
       eq(digests.digestDate, today),
-      eq(digests.status, 'ready'),
-    ))
-    .limit(1);
-  if (existingReady) {
-    console.log(`[Pipeline] Reusing existing digest for ${userId} (${today})`);
-    return existingReady.id;
+    ));
+  } else {
+    // Reuse an existing ready digest for today.
+    const [existingReady] = await db.select()
+      .from(digests)
+      .where(and(
+        eq(digests.userId, userId),
+        eq(digests.digestDate, today),
+        eq(digests.status, 'ready'),
+      ))
+      .limit(1);
+    if (existingReady) {
+      console.log(`[Pipeline] Reusing existing digest for ${userId} (${today})`);
+      return existingReady.id;
+    }
   }
 
   const [digest] = await db.insert(digests).values({

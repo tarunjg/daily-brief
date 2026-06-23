@@ -10,7 +10,8 @@ export async function GET(req: NextRequest) {
   }
 
   try {
-    const digestId = await generateBriefForUser(session.user.id);
+    const force = req.nextUrl.searchParams.get('force') === '1';
+    const digestId = await generateBriefForUser(session.user.id, { force });
     return NextResponse.redirect(new URL('/brief', req.url));
   } catch (error) {
     console.error('Brief generation error:', error);
