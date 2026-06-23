@@ -52,10 +52,10 @@ export default async function BriefPage() {
             {/* Brief header */}
             <div className="mb-8">
               <h1 className="font-display text-display text-surface-900 mb-1">
-                Your Daily Brief
+                Daily Company Brief
               </h1>
               <p className="text-surface-500 text-sm">
-                {formatDate(latestDigest.digestDate)} · {items.length} items · {latestDigest.totalWordCount} words
+                {formatDate(latestDigest.digestDate)} · AI for good — people &amp; teams worth knowing
               </p>
             </div>
 
@@ -63,17 +63,27 @@ export default async function BriefPage() {
             <BriefView
               items={items.map(item => ({
                 id: item.id,
+                itemType: (item.itemType as 'ai_news' | 'person') || 'ai_news',
                 position: item.position,
                 title: item.title,
                 summary: item.summary,
                 whyItMatters: item.whyItMatters,
-                relevanceScore: item.relevanceScore,
                 topics: item.topics || [],
                 sourceLinks: (item.sourceLinks as any[]) || [],
                 hasReflection: notesByItemId.has(item.id),
                 reflectionText: notesByItemId.get(item.id)?.textContent || null,
+                personName: item.personName,
+                personRole: item.personRole,
+                companyName: item.companyName,
+                companyOneLiner: item.companyOneLiner,
+                ceoCpoName: item.ceoCpoName,
+                ceoCpoRole: item.ceoCpoRole,
+                companyDomain: item.companyDomain,
+                domainMailable: item.domainMailable,
+                mailProvider: item.mailProvider,
+                candidateEmails: (item.candidateEmails as any[]) || [],
+                linkedinUrl: item.linkedinUrl,
               }))}
-              digestId={latestDigest.id}
             />
 
             {/* Export button */}

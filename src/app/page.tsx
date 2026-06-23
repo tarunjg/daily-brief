@@ -1,7 +1,7 @@
 import { getSession } from '@/lib/auth';
 import { redirect } from 'next/navigation';
 import Link from 'next/link';
-import { BookOpen, Mic, FileText, Sparkles } from 'lucide-react';
+import { Sparkles, Users, Mail } from 'lucide-react';
 
 export default async function HomePage() {
   const session = await getSession();
@@ -31,18 +31,18 @@ export default async function HomePage() {
                         bg-white/10 backdrop-blur-sm border border-white/10
                         text-brand-200 text-xs font-medium mb-8">
             <Sparkles className="w-3.5 h-3.5" />
-            Personalized intelligence, every morning
+            AI for good, every morning
           </div>
 
           <h1 className="font-display text-display-lg text-white mb-5">
-            Your Daily Brief.
+            Daily Company Brief.
             <br />
-            <span className="text-brand-300">Your Learning Log.</span>
+            <span className="text-brand-300">Good people, good AI.</span>
           </h1>
 
           <p className="text-lg text-brand-200 max-w-lg mx-auto mb-10 leading-relaxed">
-            A curated newsletter tailored to your goals, with built-in 
-            reflection — typed or spoken — that builds into your personal knowledge base.
+            Each morning: what you need to know in AI, and three founders doing inspiring,
+            good work worth meeting — with a personalized intro email drafted on request.
           </p>
 
           <Link href="/auth/signin" className="btn-primary text-base px-8 py-3.5 !rounded-xl">
@@ -56,37 +56,37 @@ export default async function HomePage() {
         <div className="grid sm:grid-cols-3 gap-8">
           <div className="text-center">
             <div className="w-12 h-12 rounded-xl bg-brand-100 flex items-center justify-center mx-auto mb-4">
-              <BookOpen className="w-6 h-6 text-brand-700" />
+              <Sparkles className="w-6 h-6 text-brand-700" />
             </div>
             <h3 className="font-display text-lg font-semibold text-surface-900 mb-2">
-              Curated for You
+              Know AI
             </h3>
             <p className="text-sm text-surface-500 leading-relaxed">
-              6–10 items daily, matched to your interests and goals. No noise, all signal.
-            </p>
-          </div>
-
-          <div className="text-center">
-            <div className="w-12 h-12 rounded-xl bg-accent-green/10 flex items-center justify-center mx-auto mb-4">
-              <Mic className="w-6 h-6 text-accent-green" />
-            </div>
-            <h3 className="font-display text-lg font-semibold text-surface-900 mb-2">
-              Reflect & Record
-            </h3>
-            <p className="text-sm text-surface-500 leading-relaxed">
-              Type or record voice notes on any item. Auto-transcribed and editable.
+              Three sharp bullets on what matters in AI today. No noise, all signal.
             </p>
           </div>
 
           <div className="text-center">
             <div className="w-12 h-12 rounded-xl bg-accent-purple/10 flex items-center justify-center mx-auto mb-4">
-              <FileText className="w-6 h-6 text-accent-purple" />
+              <Users className="w-6 h-6 text-accent-purple" />
             </div>
             <h3 className="font-display text-lg font-semibold text-surface-900 mb-2">
-              Learning Log
+              Meet good people
             </h3>
             <p className="text-sm text-surface-500 leading-relaxed">
-              Reflections auto-export to a Google Doc — your growing knowledge base.
+              Three founders doing inspiring, mission-driven AI work — your next Forbes profiles.
+            </p>
+          </div>
+
+          <div className="text-center">
+            <div className="w-12 h-12 rounded-xl bg-accent-green/10 flex items-center justify-center mx-auto mb-4">
+              <Mail className="w-6 h-6 text-accent-green" />
+            </div>
+            <h3 className="font-display text-lg font-semibold text-surface-900 mb-2">
+              Reach out
+            </h3>
+            <p className="text-sm text-surface-500 leading-relaxed">
+              One click drafts a personalized intro to their CEO/CPO, with their best contact found for you.
             </p>
           </div>
         </div>

@@ -1,6 +1,26 @@
-# Daily Brief – Personal Daily Brief + Learning Log
+# Daily Company Brief – AI for Good
 
-A personalized daily news brief with integrated reflection (text + voice) and automatic Google Docs export.
+A daily brief built to fuel Forbes writing about how **good people and good teams use AI for good**.
+
+Each morning it delivers:
+
+1. **What you need to know in AI** — 3 sharp, high-signal bullets.
+2. **People to meet** — 3 founders/leaders at companies doing inspiring, mission-driven AI work,
+   each a potential Forbes profile, with the CEO/CPO to contact and their best-effort email.
+3. **Draft intro email** — on request, a personalized outbound email to that CEO/CPO that
+   introduces you and your endgame, shown on screen with a copy button.
+
+Discovery is powered by **Claude + web search** (no RSS/embeddings on the hot path). Reflection
+(text + voice) and Google Docs export are retained and now apply to the companies/people surfaced.
+
+### How contact emails are found
+
+For each person we (a) ask Claude for any **publicly listed** exec email + source, (b) infer the
+most likely addresses from the company's email domain, and (c) run an **MX-record check** to
+confirm the domain can receive mail and identify the provider. Each email is labelled
+`verified` / `likely` / `fallback`. Mailbox-level SMTP verification is intentionally not used —
+port 25 is blocked on serverless and Google Workspace accepts-all, so it's unreliable. An optional
+third-party verification API can be wired behind an env flag later.
 
 ## Architecture
 
@@ -28,13 +48,15 @@ src/
 │   └── settings/              # Settings form
 ├── lib/
 │   ├── db/                    # Drizzle schema + connection
-│   ├── pipeline/              # Content ingestion, ranking, orchestration
-│   │   ├── ingest.ts          # RSS fetching + dedup
+│   ├── research/
+│   │   └── discover.ts        # Web-search brief + MX check + email inference
+│   ├── pipeline/              # Orchestration (legacy RSS files retained, off-path)
+│   │   ├── ingest.ts          # (legacy) RSS fetching + dedup
 │   │   ├── orchestrate.ts     # Main pipeline coordinator
-│   │   ├── ranking.ts         # Embedding-based ranking
-│   │   └── sources.ts         # RSS feed configuration
+│   │   ├── ranking.ts         # (legacy) embedding-based ranking
+│   │   └── sources.ts         # (legacy) RSS feed configuration
 │   ├── prompts/
-│   │   └── generate.ts        # Anthropic Claude prompting
+│   │   └── generate.ts        # Claude discovery (web search) + outbound email drafting
 │   ├── services/
 │   │   ├── email.ts           # Resend email delivery
 │   │   ├── google-docs.ts     # Google Docs API export
@@ -105,8 +127,26 @@ npx vercel
 
 The `vercel.json` configures the cron job to run every hour at :30.
 
+## Migration note
+
+This release adds columns to `digest_items` (item type + person/contact fields) and a new
+`outbound_emails` table. After pulling, apply the schema:
+
+```bash
+npm run db:push
+```
+
+## Requirements note
+
+- **Web search must be enabled** for your `ANTHROPIC_API_KEY` (the `web_search` tool) — the brief
+  is generated through it. If it isn't enabled, generation fails with a clear message.
+- `OPENAI_API_KEY` is no longer required to generate a brief (RSS/embedding path is retired), though
+  the legacy ranking files still reference it if you re-enable that path.
+
 ## Key Design Decisions
 
+- **Two sections, fixed counts** — 3 AI bullets + 3 people to meet, every day
+- **Contact confidence** — each email is `verified` / `likely` / `fallback`; domains are MX-checked
 - **One Google Doc per user** — appended daily, never overwritten
 - **Transcripts store both versions** — `original_transcript` (immutable) + `edited_transcript` (user-editable)
 - **URL provenance** — every URL in the brief is verified against the input article list; hallucinated URLs are stripped

@@ -1,40 +1,50 @@
 import { db } from '@/lib/db';
-import { users, userPreferences, digests, digestItems, articles } from '@/lib/db/schema';
-import { and, eq, desc, inArray } from 'drizzle-orm';
-import { runIngestionPipeline } from './ingest';
-import { rankArticlesForUser, semanticDedup, buildProfilePayload } from './ranking';
-import { generateBrief } from '@/lib/prompts/generate';
+import { users, userPreferences, digests, digestItems } from '@/lib/db/schema';
+import { and, eq } from 'drizzle-orm';
+import { generateCompanyBrief } from '@/lib/research/discover';
 import { sendBriefEmail } from '@/lib/services/email';
-import { formatDate, formatShortDate } from '@/lib/utils';
-import type { ArticlePayload } from '@/types';
+import { formatDate, wordCount } from '@/lib/utils';
+import type { UserProfilePayload, GoalEntry } from '@/types';
 
 /**
- * Generate a daily brief for a single user.
- * This is the main orchestration function called by the cron job.
- * 
- * Pipeline:
- * 1. Ingest new articles (shared across users)
- * 2. Rank articles for this user
- * 3. Semantic dedup
- * 4. Generate personalized brief via LLM
- * 5. Store digest + items
- * 6. Send email (if enabled)
+ * Build the profile payload from stored preferences (no external deps).
  */
-const INGESTION_MIN_INTERVAL_MS = 30 * 60 * 1000;
-
-interface GenerateBriefOptions {
-  skipIngestion?: boolean;
-  forceIngestion?: boolean;
+function buildProfilePayload(prefs: {
+  interests: string[] | null;
+  goals: unknown;
+  roleTitle: string | null;
+  seniority: string | null;
+  industries: string[] | null;
+  geography: string | null;
+  linkedinText: string | null;
+  resumeText: string | null;
+}): UserProfilePayload {
+  const goals = (prefs.goals as GoalEntry[] || []).map(g => g.text);
+  return {
+    interests: prefs.interests || [],
+    goals,
+    roleTitle: prefs.roleTitle || 'Professional',
+    seniority: prefs.seniority || 'Founder',
+    industries: prefs.industries || [],
+    geography: prefs.geography || 'Global',
+    professionalBackground: prefs.linkedinText || prefs.resumeText || 'Not provided',
+  };
 }
 
-export async function generateBriefForUser(
-  userId: string,
-  options: GenerateBriefOptions = {},
-): Promise<string> {
+/**
+ * Generate the daily company brief for a single user.
+ *
+ * Pipeline:
+ * 1. Reuse today's ready digest if it exists
+ * 2. Research via Claude + web search (3 AI bullets + 3 people to meet)
+ * 3. Enrich people with MX-validated, inferred contact emails
+ * 4. Store digest + items
+ * 5. Send email (if enabled)
+ */
+export async function generateBriefForUser(userId: string): Promise<string> {
   const startTime = Date.now();
-  console.log(`[Pipeline] Starting brief generation for user ${userId}`);
+  console.log(`[Pipeline] Starting company brief for user ${userId}`);
 
-  // Get user + preferences
   const [user] = await db.select().from(users).where(eq(users.id, userId)).limit(1);
   if (!user) throw new Error(`User ${userId} not found`);
 
@@ -46,8 +56,8 @@ export async function generateBriefForUser(
 
   const today = new Date().toISOString().split('T')[0];
 
-  // If a ready digest already exists for today, reuse it.
-  const [existingReadyDigest] = await db.select()
+  // Reuse an existing ready digest for today.
+  const [existingReady] = await db.select()
     .from(digests)
     .where(and(
       eq(digests.userId, userId),
@@ -55,12 +65,11 @@ export async function generateBriefForUser(
       eq(digests.status, 'ready'),
     ))
     .limit(1);
-  if (existingReadyDigest) {
+  if (existingReady) {
     console.log(`[Pipeline] Reusing existing digest for ${userId} (${today})`);
-    return existingReadyDigest.id;
+    return existingReady.id;
   }
 
-  // Create digest record
   const [digest] = await db.insert(digests).values({
     userId,
     digestDate: today,
@@ -68,113 +77,89 @@ export async function generateBriefForUser(
   }).returning();
 
   try {
-    // Step 1: Ingest (skip if recently ingested or explicitly disabled)
-    if (!options.skipIngestion) {
-      let shouldIngest = true;
-      if (!options.forceIngestion) {
-        const [latestArticle] = await db.select({ createdAt: articles.createdAt })
-          .from(articles)
-          .orderBy(desc(articles.createdAt))
-          .limit(1);
-        if (latestArticle?.createdAt) {
-          const ageMs = Date.now() - new Date(latestArticle.createdAt).getTime();
-          shouldIngest = ageMs > INGESTION_MIN_INTERVAL_MS;
-        }
-      }
-      if (shouldIngest) {
-        await runIngestionPipeline(prefs.interests || []);
-      } else {
-        console.log('[Pipeline] Skipping ingestion (recently ingested)');
-      }
-    }
-
-    // Step 2: Rank articles for this user
-    const ranked = await rankArticlesForUser(userId, 20);
-    if (ranked.length === 0) {
-      await db.update(digests).set({ status: 'failed', updatedAt: new Date() }).where(eq(digests.id, digest.id));
-      throw new Error('No articles available for ranking');
-    }
-
-    // Step 3: Semantic dedup
-    const deduped = await semanticDedup(ranked, 0.92);
-
-    // Step 4: Build article payloads for the LLM
-    const articlePayloads: ArticlePayload[] = deduped.slice(0, 15).map((a, i) => ({
-      index: i + 1,
-      title: a.title,
-      sourceUrl: a.sourceUrl,
-      sourceName: a.sourceName || 'Unknown',
-      publishedAt: a.publishedAt?.toISOString() || today,
-      content: (a.rawContent || '').slice(0, 2000),
-    }));
-
-    // Step 5: Generate the brief
     const profile = buildProfilePayload(prefs);
-    const brief = await generateBrief(profile, articlePayloads, today);
+    const brief = await generateCompanyBrief(profile, today);
 
-    // Step 6: Store digest items
-    const sourceUrls = articlePayloads.map(a => a.sourceUrl);
-    const articleRows = sourceUrls.length === 0 ? [] : await db.select({
-      id: articles.id,
-      sourceUrl: articles.sourceUrl,
-    })
-      .from(articles)
-      .where(inArray(articles.sourceUrl, sourceUrls));
-    const articleIdByUrl = new Map(articleRows.map(row => [row.sourceUrl, row.id]));
+    if (brief.aiNews.length === 0 && brief.people.length === 0) {
+      await db.update(digests).set({ status: 'failed', updatedAt: new Date() }).where(eq(digests.id, digest.id));
+      throw new Error('Brief generation returned no items');
+    }
 
-    for (const item of brief.items) {
-      const matchingLink = item.sourceLinks.find(link => articleIdByUrl.has(link.url));
-      const articleId = matchingLink ? articleIdByUrl.get(matchingLink.url) : undefined;
-      if (!articleId) continue;
-
+    // Store AI news bullets.
+    for (const n of brief.aiNews) {
       await db.insert(digestItems).values({
         digestId: digest.id,
-        articleId,
-        position: item.position,
-        title: item.title,
-        summary: item.summary,
-        whyItMatters: item.whyItMatters,
-        relevanceScore: item.relevanceScore,
-        topics: item.topics,
-        sourceLinks: item.sourceLinks,
+        itemType: 'ai_news',
+        position: n.position,
+        title: n.title,
+        summary: n.summary,
+        whyItMatters: n.whyItMatters,
+        topics: n.topics,
+        sourceLinks: n.sourceLinks,
       });
     }
 
-    // Update digest status
+    // Store people to meet.
+    for (const p of brief.people) {
+      await db.insert(digestItems).values({
+        digestId: digest.id,
+        itemType: 'person',
+        position: p.position,
+        title: p.companyName || p.personName,
+        summary: p.companyOneLiner,
+        whyItMatters: p.whyMeet,
+        sourceLinks: p.sourceLinks,
+        personName: p.personName,
+        personRole: p.personRole,
+        companyName: p.companyName,
+        companyOneLiner: p.companyOneLiner,
+        ceoCpoName: p.ceoCpoName,
+        ceoCpoRole: p.ceoCpoRole,
+        companyDomain: p.companyDomain,
+        domainMailable: p.domainMailable,
+        mailProvider: p.mailProvider,
+        candidateEmails: p.candidateEmails,
+        linkedinUrl: p.linkedinUrl,
+        whyMeet: p.whyMeet,
+      });
+    }
+
+    const newsWords = brief.aiNews.reduce(
+      (sum, n) => sum + wordCount(n.summary || '') + wordCount(n.whyItMatters || ''), 0);
+    const peopleWords = brief.people.reduce(
+      (sum, p) => sum + wordCount(p.companyOneLiner || '') + wordCount(p.whyMeet || ''), 0);
+    const totalWords = newsWords + peopleWords;
+
     await db.update(digests).set({
       status: 'ready',
-      totalWordCount: brief.totalWordCount,
+      totalWordCount: totalWords,
       generatedAt: new Date(),
       updatedAt: new Date(),
     }).where(eq(digests.id, digest.id));
 
-    // Step 7: Send email if enabled
     if (user.emailBriefEnabled) {
       await sendBriefEmail(user.email, {
         userName: user.name,
         briefDate: formatDate(today),
-        items: brief.items,
+        aiNews: brief.aiNews,
+        people: brief.people,
         appUrl: process.env.APP_URL || 'http://localhost:3000',
       });
     }
 
     const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
-    console.log(`[Pipeline] Brief generated for ${user.email} in ${elapsed}s (${brief.items.length} items, ${brief.totalWordCount} words)`);
+    console.log(`[Pipeline] Brief generated for ${user.email} in ${elapsed}s (${brief.aiNews.length} news, ${brief.people.length} people)`);
 
     return digest.id;
   } catch (error) {
     console.error(`[Pipeline] Failed for user ${userId}:`, error);
-    await db.update(digests).set({
-      status: 'failed',
-      updatedAt: new Date(),
-    }).where(eq(digests.id, digest.id));
+    await db.update(digests).set({ status: 'failed', updatedAt: new Date() }).where(eq(digests.id, digest.id));
     throw error;
   }
 }
 
 /**
- * Generate briefs for all users (called by cron).
- * Groups users by timezone and processes sequentially.
+ * Generate briefs for all onboarded users (called by cron).
  */
 export async function generateBriefsForAllUsers(): Promise<void> {
   const allUsers = await db.select({ id: users.id, email: users.email })
@@ -183,28 +168,9 @@ export async function generateBriefsForAllUsers(): Promise<void> {
 
   console.log(`[Pipeline] Generating briefs for ${allUsers.length} users`);
 
-  if (allUsers.length === 0) return;
-
-  // Run ingestion once for the union of all user interests.
-  const userIds = allUsers.map(u => u.id);
-  const allPrefs = await db.select({ interests: userPreferences.interests })
-    .from(userPreferences)
-    .where(inArray(userPreferences.userId, userIds));
-  const interestSet = new Set<string>();
-  for (const prefs of allPrefs) {
-    (prefs.interests || []).forEach(interest => interestSet.add(interest));
-  }
-  const combinedInterests = interestSet.size > 0 ? Array.from(interestSet) : undefined;
-
-  try {
-    await runIngestionPipeline(combinedInterests);
-  } catch (error) {
-    console.error('[Pipeline] Ingestion failed before cron run:', error);
-  }
-
   for (const user of allUsers) {
     try {
-      await generateBriefForUser(user.id, { skipIngestion: true });
+      await generateBriefForUser(user.id);
     } catch (error) {
       console.error(`[Pipeline] Skipping user ${user.email}:`, error);
     }

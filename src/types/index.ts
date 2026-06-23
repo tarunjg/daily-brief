@@ -36,18 +36,18 @@ export interface RankedArticle extends RawArticle {
   embedding?: number[];
 }
 
-// ─── Newsletter / Digest ───
+// ─── Company Brief / Digest ───
 
 export type DigestStatus = 'pending' | 'generating' | 'ready' | 'failed';
 
-export interface DigestItem {
-  position: number;
-  title: string;
-  summary: string;
-  whyItMatters: string;
-  relevanceScore: number;
-  topics: string[];
-  sourceLinks: SourceLink[];
+export type ItemType = 'ai_news' | 'person';
+
+export type EmailConfidence = 'verified' | 'likely' | 'fallback';
+
+export interface CandidateEmail {
+  email: string;
+  confidence: EmailConfidence;
+  source?: string; // URL when verified (publicly listed)
 }
 
 export interface SourceLink {
@@ -55,10 +55,70 @@ export interface SourceLink {
   label: string;
 }
 
+/** One of the three "what you need to know in AI" bullets. */
+export interface AiNewsItem {
+  position: number;
+  title: string;
+  summary: string;
+  whyItMatters: string;
+  topics: string[];
+  sourceLinks: SourceLink[];
+}
+
+/** One of the three "people to meet" cards. */
+export interface PersonItem {
+  position: number;
+  personName: string;
+  personRole: string;
+  companyName: string;
+  companyOneLiner: string;
+  whyMeet: string;
+  ceoCpoName: string;
+  ceoCpoRole: string;
+  companyDomain: string | null;
+  domainMailable: boolean;
+  mailProvider: string | null;
+  candidateEmails: CandidateEmail[];
+  linkedinUrl: string | null;
+  sourceLinks: SourceLink[];
+}
+
+/** Unified storage shape (one row per digest item). */
+export interface DigestItem {
+  itemType: ItemType;
+  position: number;
+  title: string;
+  summary: string;
+  whyItMatters: string;
+  relevanceScore: number;
+  topics: string[];
+  sourceLinks: SourceLink[];
+  // Person-only fields (undefined for ai_news)
+  personName?: string;
+  personRole?: string;
+  companyName?: string;
+  companyOneLiner?: string;
+  whyMeet?: string;
+  ceoCpoName?: string;
+  ceoCpoRole?: string;
+  companyDomain?: string | null;
+  domainMailable?: boolean;
+  mailProvider?: string | null;
+  candidateEmails?: CandidateEmail[];
+  linkedinUrl?: string | null;
+}
+
 export interface GeneratedBrief {
   briefDate: string;
-  totalWordCount: number;
-  items: DigestItem[];
+  narrativeThread: string;
+  aiNews: AiNewsItem[];
+  people: PersonItem[];
+}
+
+export interface OutboundEmailDraft {
+  toEmail: string | null;
+  subject: string;
+  body: string;
 }
 
 // ─── Reflections ───
@@ -90,7 +150,8 @@ export interface VoiceNote {
 export interface BriefEmailData {
   userName: string;
   briefDate: string;
-  items: DigestItem[];
+  aiNews: AiNewsItem[];
+  people: PersonItem[];
   appUrl: string;
 }
 

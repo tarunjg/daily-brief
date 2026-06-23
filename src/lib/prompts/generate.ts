@@ -1,289 +1,308 @@
 import Anthropic from '@anthropic-ai/sdk';
-import type { GeneratedBrief, ArticlePayload, UserProfilePayload } from '@/types';
-import { wordCount } from '@/lib/utils';
+import type { UserProfilePayload, PersonItem, OutboundEmailDraft } from '@/types';
 import { getRequiredEnv } from '@/lib/env';
 
 const anthropic = new Anthropic({ apiKey: getRequiredEnv('ANTHROPIC_API_KEY') });
 
-// ─── System Prompt (never changes) ───
-const SYSTEM_PROMPT = `You are the user's go-to sideline analyst — think a mix between a sharp sports commentator and a brilliant friend who reads everything so they don't have to. Your job is to break down the day's most important news like you're breaking down game film: clear, punchy, and always connecting the play to the bigger picture.
+const MODEL = 'claude-sonnet-4-6';
 
-YOUR #1 JOB: Tell a coherent story.
-This brief is not a list of random headlines. It's a narrative. Think of it like a pregame show that builds toward tip-off:
-- Open with the biggest, most consequential story of the day — the headline that sets the tone.
-- Each subsequent item should feel like a natural next beat. If item 1 is about AI regulation, maybe item 2 is about a company making moves in response, and item 3 zooms out to the economic implications.
-- Use lightweight narrative transitions in your summaries. Connect the dots: "Meanwhile..." / "On the other side of that coin..." / "Speaking of defensive plays..." / "And then there's the wildcard..."
-- End with something forward-looking or thought-provoking — a "watch this space" item that leaves the reader thinking.
-- NEVER include two items that cover essentially the same story or angle. If three articles are about the same event, pick the best one and weave in details from the others. Consolidate, don't duplicate.
-- Aim for topic diversity across the brief. Cover different domains — don't cluster 4 AI stories together unless the day genuinely demands it.
+// ─── Who the brief is for (single-user app: Tarun) ───
+const READER_PROFILE = [
+  `=== WHO YOU'RE WRITING FOR ===`,
+  `NAME: Tarun Galagali`,
+  `ROLE: Founder & CEO, Mandala For Us, Inc. — and a Forbes contributor.`,
+  `LOCATION: Los Gatos, California`,
+  ``,
+  `THE ENDGAME (most important — this is what the brief serves):`,
+  `Tarun writes Forbes pieces about how GOOD PEOPLE and GOOD TEAMS use AI for good —`,
+  `for good causes and through good character. He is far more interested in the people`,
+  `and teams behind the work than in the technology itself. The brief exists to (a) keep`,
+  `him sharp on AI and (b) surface inspiring founders/leaders he should meet and`,
+  `potentially profile, then help him reach out to them.`,
+  ``,
+  `COMPANY CONTEXT:`,
+  `Mandala is an AI-powered leadership coaching platform native to Slack, combining`,
+  `neuroscience-based leadership development (a "parasympathetic intelligence" thesis`,
+  `developed with Dr. Michael Platt, Head of Neuroscience at Wharton) with AI. He is`,
+  `co-authoring "PAUSE: Leading with Parasympathetic Intelligence" (Basic Books, 2027).`,
+  ``,
+  `CAREER BACKGROUND (for credibility in outreach):`,
+  `  - Harvard Business School MBA (2022)`,
+  `  - Head of Product Marketing & Strategy at Verily (Alphabet's life sciences company)`,
+  `  - Product roles at Google; Talkspace (through their IPO); Parthenon-EY (strategy)`,
+  `  - English Literature undergrad (a writer at heart)`,
+  ``,
+  `WHAT "GOOD" MEANS TO HIM:`,
+  `  - AI applied to genuine social impact: health, education, climate, accessibility,`,
+  `    mental health, democracy, opportunity, scientific progress.`,
+  `  - Founders and teams of strong character — mission-driven, humane, doing right by`,
+  `    their people and users, not just chasing hype or valuation.`,
+  `  - Real, shipped work over vaporware. Substance over spin.`,
+].join('\n');
 
-Your voice:
-- Playful and accessible, but never dumb. You respect the reader's intelligence.
-- Use basketball metaphors naturally — not forced into every sentence, but woven in where they genuinely help explain what's happening. Think "this is their full-court press on regulation" or "they're playing small ball with this acquisition" — not "SLAM DUNK NEWS ALERT!!!"
-- Provocative when warranted. Ask the spicy question. Name the tension. Don't be afraid to say "this matters more than people think" or "honestly, most coverage of this is missing the real story."
-- Concise and punchy. Short sentences hit harder. Use them.
-- Conversational — write like you're texting a very smart friend, not drafting a memo for the board.
-- Occasionally funny. A well-placed joke lands better than three paragraphs of analysis.
+// ═══════════════════════════════════════════════════════════════════
+//  PART 1 — Daily discovery (web search)
+// ═══════════════════════════════════════════════════════════════════
 
-What you NEVER do:
-- Use corporate buzzwords ("synergy," "leverage," "ecosystem," "in today's fast-paced world")
-- Write filler. Every sentence earns its spot on the roster.
-- Include two items that cover the same story, angle, or theme. Merge them or pick the best one.
-- Invent or hallucinate URLs. Only use URLs provided in the ARTICLES section.
-- Fabricate facts, statistics, or quotes not in the source material.
-- Force basketball metaphors where they don't fit. If it feels like a stretch, skip it.
+const DISCOVERY_SYSTEM_PROMPT = `You are Tarun's research analyst and scout. Every day you do two jobs:
 
-Constraints:
-- Total brief: 6–10 items, ≤ 900 words total.
-- Each item: a clear title (rewrite clickbait into something real), 2–3 sentence summary, a "Why it matters for you" section (1–2 sentences connecting to the user's stated goals — be specific, reference their actual goals), and 1–3 source hyperlinks.
-- Return ONLY valid JSON matching the schema below. No markdown, no preamble, no commentary outside the JSON.
+1. Brief him on what he needs to know in AI — 3 sharp, high-signal bullets.
+2. Find 3 people he should meet — founders or leaders at companies doing inspiring things
+   with AI FOR GOOD. These are potential subjects for his Forbes column about good people
+   and good teams using AI for good.
 
-Required JSON schema:
+You have a web_search tool. USE IT to ground everything in real, recent, verifiable facts.
+Search for current AI developments and for companies/founders doing genuinely inspiring,
+mission-driven AI work. Prefer the last ~30 days; never fabricate.
+
+Your voice: clear, warm, and substantive. Punchy but never dumb. No corporate buzzwords
+("synergy", "leverage", "ecosystem"). Respect the reader's intelligence.
+
+WHAT MAKES A GREAT "PERSON TO MEET":
+- The company uses AI for real social good (health, education, climate, accessibility,
+  mental health, science, opportunity, democracy) OR the team is a model of good character.
+- There is a specific, nameable human — ideally a founder/CEO/CPO — worth profiling.
+- It's a story Tarun could credibly pitch to Forbes: a good person/team, doing good, with AI.
+- Avoid the obvious giants unless there's a genuinely fresh, human angle. Favor founders he
+  could actually reach and who'd benefit from his platform.
+
+FOR EACH PERSON, you must identify:
+- The person to meet and their role.
+- The company, a one-line description, and WHY Tarun should meet them (the Forbes angle).
+- The CEO or CPO to contact (name + role) — the person he'd email to start the conversation.
+- The company's primary email DOMAIN (e.g. "anthropic.com"), found via search. Bare domain only.
+- Any PUBLICLY LISTED email for that CEO/CPO, with the source URL where you saw it. Only include
+  an email if you genuinely found it published somewhere; otherwise null. Never invent an address.
+- A best-guess LinkedIn URL for the CEO/CPO (or the person), or null.
+- 1-3 source links (real URLs from your searches) supporting the story.
+
+CRITICAL OUTPUT RULES:
+- Do your searching and thinking, then end your turn with EXACTLY ONE JSON object,
+  wrapped in a \`\`\`json fenced code block. No commentary after it.
+- Every URL must be a real URL you actually encountered via search. Never guess URLs.
+- Exactly 3 ai_news items and exactly 3 people.
+
+JSON schema:
+\`\`\`json
 {
   "brief_date": "YYYY-MM-DD",
-  "total_word_count": <number>,
-  "narrative_thread": "<1 sentence describing today's overarching theme or throughline>",
-  "items": [
+  "narrative_thread": "<1 sentence on today's throughline>",
+  "ai_news": [
     {
-      "position": <1-10>,
-      "title": "<clear, punchy title — rewrite clickbait>",
-      "summary": "<2-3 sentences, factual but with personality. Use a basketball metaphor if it genuinely fits. Use a light transition from the previous item where natural.>",
-      "why_it_matters": "<1-2 sentences connecting to user's goals. Be direct — 'This matters for your [specific goal] because...' >",
-      "relevance_score": <0.0-1.0>,
-      "topics": ["<topic1>", "<topic2>"],
-      "source_links": [
-        { "url": "<exact URL from input>", "label": "<source name>" }
-      ]
+      "title": "<clear, punchy headline>",
+      "summary": "<2-3 sentences, factual with personality>",
+      "why_it_matters": "<1-2 sentences tying to Tarun's work/Forbes/Mandala>",
+      "topics": ["<topic>", "<topic>"],
+      "source_links": [ { "url": "<real url>", "label": "<source name>" } ]
+    }
+  ],
+  "people": [
+    {
+      "person_name": "<the inspiring person>",
+      "person_role": "<their role/title>",
+      "company_name": "<company>",
+      "company_one_liner": "<what they do, one line>",
+      "why_meet": "<2-3 sentences: the Forbes-worthy good-people/good-AI angle>",
+      "ceo_cpo_name": "<CEO or CPO to contact>",
+      "ceo_cpo_role": "<CEO | CPO | Co-founder & CEO | etc>",
+      "company_domain": "<bare email domain or null>",
+      "found_email": "<publicly listed exec email or null>",
+      "found_email_source": "<url where found or null>",
+      "linkedin_url": "<best-guess LinkedIn url or null>",
+      "source_links": [ { "url": "<real url>", "label": "<source name>" } ]
     }
   ]
-}`;
+}
+\`\`\``;
 
-/**
- * Build the developer/user prompt with the user's profile and candidate articles.
- */
-function buildPrompt(
-  profile: UserProfilePayload,
-  candidateArticles: ArticlePayload[],
-  today: string,
-): string {
-  const profileSection = [
-    `=== WHO YOU'RE WRITING FOR ===`,
-    `NAME: Tarun Galagali`,
-    `ROLE: Founder & CEO, Mandala For Us, Inc.`,
-    `LOCATION: Los Gatos, California`,
-    ``,
-    `COMPANY CONTEXT:`,
-    `Mandala is an AI-powered leadership coaching platform that operates natively within Slack, providing real-time coaching to managers and employees. The company combines neuroscience-based leadership development (built on a "parasympathetic intelligence" thesis developed with Dr. Michael Platt, Head of Neuroscience at Wharton) with AI technology. Key metrics: $667K in management training revenue, $85K in AI coaching pilots, ~300 users installed with ~80 monthly active. Enterprise customers include Pendo (~900 employees, $200K ARR commitment expanding from pilot to full rollout), Grow Therapy, FalconX, and Proof. SOC 2 Type 2 certified. Tech stack: Python backend, Postgres, Slack app with automated container deployments. Engineering team: John, Sagun.`,
-    ``,
-    `ACTIVE STRATEGIC PRIORITIES:`,
-    `  1. Acquisition path: Actively pursuing acquisition rather than fundraising. Ongoing conversations with Lattice (CEO Sarah Franklin — exploring deeper product integration due to customer demand), potential discussions with Calm's enterprise division, and new partnership with Elevate Leadership and BTS.`,
-    `  2. Enterprise growth: Pendo expanding to full 900-employee population. Clay (scaling 300→600 employees) — training 30-35 managers. Building enterprise pipeline.`,
-    `  3. Book: Co-authoring "PAUSE: Leading with Parasympathetic Intelligence" with Dr. Michael Platt (Basic Books/Hachette, 2027, $40K advance). This positions Tarun as thought leader in neuroscience-based leadership.`,
-    `  4. Forbes contributor: Writing about AI's impact on leadership and organizations. Interviewing CEOs (Headspace, Harvey, Leapsome, Arctic Wolf, etc.) on leadership, AI, future of work. Writes 2x/month.`,
-    `  5. Product development: RAG integration, workspace intelligence features, scaling infrastructure from hundreds to thousands of users.`,
-    `  6. "Power of Pause" workshops and Ohio State University resilient leadership program (2,000+ students).`,
-    ``,
-    `CAREER BACKGROUND:`,
-    `  - Harvard Business School MBA (Class of 2022)`,
-    `  - Head of Product Marketing & Strategy at Verily (Alphabet's life sciences company)`,
-    `  - Product roles at Google`,
-    `  - Talkspace (through their IPO) — healthcare + tech intersection`,
-    `  - Parthenon-EY (strategy consulting)`,
-    `  - English Literature undergrad (creative writing instincts)`,
-    ``,
-    `PERSONAL CONTEXT:`,
-    `  - Wife works on democracy and venture capital issues, teaches "Sustainable Capitalism"`,
-    `  - Actively trying to conceive / planning for first child`,
-    `  - Building a "Dad Ready" habit tracking app for expecting fathers`,
-    `  - ENFP, 2w3 enneagram — draws energy from connected relationships and rapid idea execution`,
-    `  - Admires Larry from "The Razor's Edge" for blissful detachment and optimism`,
-    `  - Starts work around 6 AM Pacific`,
-    ``,
-    `INTERESTS: ${profile.interests.join(', ')}`,
-    ``,
-    `STATED GOALS:`,
-    ...profile.goals.map((g, i) => `  ${i + 1}. ${g}`),
-    ``,
-    `WHAT MAKES THIS BRIEF FEEL PERSONAL:`,
-    `  - Connect enterprise SaaS news to Mandala's acquisition and growth plays`,
-    `  - AI/ML developments → how they affect Mandala's AI coaching product or the coaching industry`,
-    `  - Neuroscience, psychology, behavioral science → his book and "parasympathetic intelligence" thesis`,
-    `  - Leadership, management, future of work → his Forbes writing and workshop delivery`,
-    `  - Healthcare tech → his Talkspace/Verily background and Mandala's wellness angle`,
-    `  - Enterprise HR tech (Lattice, BambooHR, Workday, etc.) → direct competitive/partnership landscape`,
-    `  - VC/fundraising/M&A activity → relevant to his acquisition strategy`,
-    `  - Education + university partnerships → OSU program and potential expansion`,
-    `  - Parenting, fertility, family planning → personal relevance (Dad Ready app)`,
-    `  - Democracy, sustainable capitalism → his wife's work`,
-  ].join('\n');
+export interface RawBriefPerson {
+  person_name: string;
+  person_role: string;
+  company_name: string;
+  company_one_liner: string;
+  why_meet: string;
+  ceo_cpo_name: string;
+  ceo_cpo_role: string;
+  company_domain: string | null;
+  found_email: string | null;
+  found_email_source: string | null;
+  linkedin_url: string | null;
+  source_links: { url: string; label: string }[];
+}
 
-  const articlesSection = candidateArticles.map(a => [
-    `[${a.index}] Title: ${a.title}`,
-    `    URL: ${a.sourceUrl}`,
-    `    Source: ${a.sourceName}`,
-    `    Published: ${a.publishedAt}`,
-    `    Content: ${a.content}`,
-    `    ---`,
-  ].join('\n')).join('\n');
+export interface RawBrief {
+  brief_date: string;
+  narrative_thread: string;
+  ai_news: {
+    title: string;
+    summary: string;
+    why_it_matters: string;
+    topics: string[];
+    source_links: { url: string; label: string }[];
+  }[];
+  people: RawBriefPerson[];
+}
 
-  return `You are generating a daily brief for a specific user. Here is their profile:
+function buildDiscoveryPrompt(profile: UserProfilePayload, today: string): string {
+  const interests = profile.interests.length ? profile.interests.join(', ') : 'AI, leadership, social impact';
+  const goals = profile.goals.length ? profile.goals.map((g, i) => `  ${i + 1}. ${g}`).join('\n') : '  (none specified)';
 
-${profileSection}
+  return `${READER_PROFILE}
+
+INTERESTS: ${interests}
+
+STATED GOALS:
+${goals}
 
 Today's date: ${today}
 
-Below are ${candidateArticles.length} candidate articles, ranked by estimated relevance. Select the top 6–10 most relevant items and generate the brief.
+Produce today's brief now. Search the web first to ground everything in real, recent facts,
+then return the single JSON object per your instructions:
+- 3 "ai_news" bullets: what Tarun needs to know in AI today.
+- 3 "people" to meet: inspiring founders/teams using AI for good, each a potential Forbes profile.
+Remember: he cares most about GOOD PEOPLE and GOOD TEAMS. Find humans worth meeting.`;
+}
 
-NARRATIVE ARC — THIS IS CRITICAL:
-Think of this brief like a 4-quarter game. Structure it with intention:
-- Q1 (items 1-2): Lead with the day's biggest story. Set the tone.
-- Q2 (items 3-4): Expand the picture. Related angles, adjacent themes.
-- Q3 (items 5-6): Shift to a different domain. Surprise the reader. Show range.
-- Q4 (items 7-8+): Close with something forward-looking or provocative. Leave them thinking.
-
-If two articles cover the same event or angle, MERGE them into one item (you can cite multiple source_links). Never give the reader deja vu.
-
-For each item, write a "why_it_matters" that connects the article to Tarun's SPECIFIC situation — not generic goals, but his actual plays. Reference Mandala, the Lattice conversations, the book, Forbes, Pendo, the acquisition strategy, or his personal life by name. Make it feel like a chief of staff whispering "here's why you should care about this one."
-
-Examples of GREAT why_it_matters:
-- "Lattice just did X — which is exactly the integration angle Sarah Franklin was exploring with you."
-- "This validates the parasympathetic intelligence thesis you and Dr. Platt are building the book around."
-- "If Pendo sees this before your next check-in, they'll have questions. Get ahead of it."
-- "Your next Forbes piece on AI leadership? This is the case study."
-- "As you're thinking about the Elevate partnership and BTS tech integration, this competitive move matters."
-
-TONE REMINDER: Be punchy, fun, and provocative. Use basketball metaphors where they naturally fit. Write like a brilliant friend breaking down the news, not like a corporate newsletter. Short sentences. Personality. An occasional joke. But always substantive — never sacrifice insight for style.
-
-CRITICAL RULES:
-1. Only use URLs from the ARTICLES section below. Do NOT generate, guess, or modify any URL.
-2. Every source_link url must exactly match a URL from the articles below.
-3. Keep total word count under 900 words.
-4. Each item should be under 120 words.
-5. No two items should cover the same story or same angle. Deduplicate aggressively.
-6. Return ONLY the JSON object. Nothing else.
-
-ARTICLES:
-${articlesSection}`;
+/** Extract the last JSON object from a model response (handles ```json fences). */
+function extractJson(text: string): string {
+  const fenceMatch = Array.from(text.matchAll(/```(?:json)?\s*([\s\S]*?)```/g));
+  if (fenceMatch.length > 0) {
+    return fenceMatch[fenceMatch.length - 1][1].trim();
+  }
+  // Fallback: slice from first '{' to last '}'
+  const first = text.indexOf('{');
+  const last = text.lastIndexOf('}');
+  if (first !== -1 && last > first) {
+    return text.slice(first, last + 1).trim();
+  }
+  return text.trim();
 }
 
 /**
- * Generate a personalized daily brief using Claude.
+ * Run the daily discovery via Claude + web search.
+ * Returns the raw, un-enriched brief (email/MX enrichment happens in research/discover.ts).
  */
-export async function generateBrief(
+export async function runDiscovery(
   profile: UserProfilePayload,
-  candidateArticles: ArticlePayload[],
   today: string,
-): Promise<GeneratedBrief> {
-  const userPrompt = buildPrompt(profile, candidateArticles, today);
+): Promise<RawBrief> {
+  const userPrompt = buildDiscoveryPrompt(profile, today);
+
+  // web_search is a server tool; SDK types in this version don't model it, so cast.
+  const tools = [{ type: 'web_search_20250305', name: 'web_search', max_uses: 8 }] as any;
+
+  const messages: Anthropic.MessageParam[] = [{ role: 'user', content: userPrompt }];
+  let allText = '';
+
+  // Handle pause_turn (long server-tool runs) by continuing up to a few times.
+  for (let turn = 0; turn < 4; turn++) {
+    let response: Anthropic.Message;
+    try {
+      response = await anthropic.messages.create({
+        model: MODEL,
+        max_tokens: 8000,
+        system: DISCOVERY_SYSTEM_PROMPT,
+        messages,
+        tools,
+      });
+    } catch (error: any) {
+      const msg = String(error?.message || error);
+      if (/web_search|tool.*not.*(enabled|available|supported)|invalid.*tool/i.test(msg)) {
+        throw new Error(
+          'Web search is not enabled for this Anthropic API key. Enable the web_search tool ' +
+          'in the Anthropic console to generate the company brief.',
+        );
+      }
+      throw error;
+    }
+
+    for (const block of response.content) {
+      if (block.type === 'text') allText += block.text + '\n';
+    }
+
+    if ((response.stop_reason as string) === 'pause_turn') {
+      // Feed assistant content back to continue the turn.
+      messages.push({ role: 'assistant', content: response.content as any });
+      continue;
+    }
+    break;
+  }
+
+  const jsonStr = extractJson(allText);
+  let parsed: RawBrief;
+  try {
+    parsed = JSON.parse(jsonStr);
+  } catch (error) {
+    console.error('[Discovery] Invalid JSON:', jsonStr.slice(0, 800));
+    throw new Error(`Discovery returned invalid JSON: ${error}`);
+  }
+  return parsed;
+}
+
+// ═══════════════════════════════════════════════════════════════════
+//  PART 2 — Outbound intro email draft
+// ═══════════════════════════════════════════════════════════════════
+
+const EMAIL_SYSTEM_PROMPT = `You draft warm, concise, genuine outbound intro emails on Tarun's behalf.
+
+These go to the CEO or CPO of a company doing inspiring AI-for-good work. The goal: open a
+real conversation that could lead to a Forbes profile of their good work and good team.
+
+Rules for a great email:
+- Short. 120-160 words in the body. Busy founders skim.
+- Lead with something specific and true about THEM — what they're building and why it's good.
+  Show you actually paid attention. No flattery that could be copy-pasted to anyone.
+- Introduce Tarun briefly and credibly: Forbes contributor writing about good people/teams
+  using AI for good; founder/CEO of Mandala (AI leadership coaching); ex-Verily/Google; HBS.
+- Make the ask light and clear: a short conversation, with an eye toward featuring them.
+- Warm, human, literary-but-plain voice. No buzzwords, no hype, no "I hope this email finds you well."
+- A clear, specific subject line.
+
+Return ONLY a JSON object, no fences, no commentary:
+{ "subject": "<subject line>", "body": "<email body, plain text with line breaks as \\n>" }`;
+
+/** Draft a personalized outbound intro email to a person's CEO/CPO. */
+export async function draftOutboundEmail(
+  person: PersonItem,
+  toEmail: string | null,
+): Promise<OutboundEmailDraft> {
+  const context = [
+    `RECIPIENT: ${person.ceoCpoName} (${person.ceoCpoRole}) at ${person.companyName}.`,
+    toEmail ? `RECIPIENT EMAIL: ${toEmail}` : `RECIPIENT EMAIL: (unknown — write greeting to them by name)`,
+    `COMPANY: ${person.companyName} — ${person.companyOneLiner}`,
+    `THE INSPIRING ANGLE / WHY TARUN WANTS TO MEET THEM: ${person.whyMeet}`,
+    person.personName && person.personName !== person.ceoCpoName
+      ? `NOTE: The person who first caught Tarun's eye is ${person.personName} (${person.personRole}).`
+      : '',
+    `SOURCES Tarun read: ${person.sourceLinks.map(l => l.label).join(', ')}`,
+  ].filter(Boolean).join('\n');
 
   const response = await anthropic.messages.create({
-    model: 'claude-sonnet-4-20250514',
-    max_tokens: 4096,
-    system: SYSTEM_PROMPT,
-    messages: [
-      { role: 'user', content: userPrompt },
-    ],
+    model: MODEL,
+    max_tokens: 1024,
+    system: EMAIL_SYSTEM_PROMPT,
+    messages: [{
+      role: 'user',
+      content: `${READER_PROFILE}\n\nDraft the outbound intro email.\n\n${context}`,
+    }],
   });
 
-  // Extract text content
   const textBlock = response.content.find(b => b.type === 'text');
-  if (!textBlock || textBlock.type !== 'text') {
-    throw new Error('No text response from LLM');
-  }
+  if (!textBlock || textBlock.type !== 'text') throw new Error('No text response from email draft');
 
-  // Parse JSON
-  let rawJson = textBlock.text.trim();
-  
-  // Strip markdown code fences if present
-  if (rawJson.startsWith('```')) {
-    rawJson = rawJson.replace(/^```(?:json)?\s*/, '').replace(/\s*```$/, '');
-  }
+  let raw = textBlock.text.trim();
+  if (raw.startsWith('```')) raw = raw.replace(/^```(?:json)?\s*/, '').replace(/\s*```$/, '');
+  const first = raw.indexOf('{');
+  const last = raw.lastIndexOf('}');
+  if (first !== -1 && last > first) raw = raw.slice(first, last + 1);
 
-  let parsed: any;
+  let parsed: { subject: string; body: string };
   try {
-    parsed = JSON.parse(rawJson);
+    parsed = JSON.parse(raw);
   } catch (error) {
-    console.error('[LLM] Invalid JSON response:', rawJson.slice(0, 500));
-    throw new Error(`LLM returned invalid JSON: ${error}`);
+    console.error('[Email] Invalid JSON:', raw.slice(0, 500));
+    throw new Error(`Email draft returned invalid JSON: ${error}`);
   }
 
-  // Validate and transform
-  const brief = validateBrief(parsed, candidateArticles, today);
-  return brief;
-}
-
-/**
- * Validate the LLM output against our constraints.
- */
-function validateBrief(
-  raw: any,
-  inputArticles: ArticlePayload[],
-  today: string,
-): GeneratedBrief {
-  const inputUrls = new Set(inputArticles.map(a => a.sourceUrl));
-
-  let items = (raw.items || []).map((item: any, index: number) => {
-    // Validate source links — remove any URL not in the input
-    const validLinks = (item.source_links || []).filter((link: any) =>
-      inputUrls.has(link.url)
-    );
-
-    // If no valid links remain, try to find the matching input article
-    if (validLinks.length === 0) {
-      const matching = inputArticles.find(a =>
-        a.title.toLowerCase().includes(item.title.toLowerCase().slice(0, 30)) ||
-        item.title.toLowerCase().includes(a.title.toLowerCase().slice(0, 30))
-      );
-      if (matching) {
-        validLinks.push({ url: matching.sourceUrl, label: matching.sourceName });
-      }
-    }
-
-    return {
-      position: item.position || index + 1,
-      title: item.title || 'Untitled',
-      summary: item.summary || '',
-      whyItMatters: item.why_it_matters || '',
-      relevanceScore: Math.min(1, Math.max(0, item.relevance_score || 0.5)),
-      topics: item.topics || [],
-      sourceLinks: validLinks,
-    };
-  });
-
-  // Enforce 6–10 items
-  if (items.length > 10) {
-    items = items.slice(0, 10);
-  }
-
-  // Calculate total word count
-  const totalWords = items.reduce((sum: number, item: any) =>
-    sum + wordCount(item.title) + wordCount(item.summary) + wordCount(item.whyItMatters),
-    0
-  );
-
-  // If over 900 words, remove lowest-relevance items
-  if (totalWords > 900 && items.length > 6) {
-    items.sort((a: any, b: any) => b.relevanceScore - a.relevanceScore);
-    while (items.length > 6) {
-      const currentWords = items.reduce((sum: number, item: any) =>
-        sum + wordCount(item.title) + wordCount(item.summary) + wordCount(item.whyItMatters),
-        0
-      );
-      if (currentWords <= 900) break;
-      items.pop();
-    }
-    // Re-sort by position
-    items.sort((a: any, b: any) => a.position - b.position);
-    // Re-number positions
-    items.forEach((item: any, i: number) => { item.position = i + 1; });
-  }
-
-  return {
-    briefDate: today,
-    totalWordCount: items.reduce((sum: number, item: any) =>
-      sum + wordCount(item.title) + wordCount(item.summary) + wordCount(item.whyItMatters),
-      0
-    ),
-    items,
-  };
+  return { toEmail, subject: parsed.subject || '', body: parsed.body || '' };
 }
