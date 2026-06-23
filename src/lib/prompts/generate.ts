@@ -6,6 +6,10 @@ const anthropic = new Anthropic({ apiKey: getRequiredEnv('ANTHROPIC_API_KEY') })
 
 const MODEL = 'claude-sonnet-4-6';
 
+// Tarun's public profiles — included in outbound intro emails so recipients can vet him.
+export const TARUN_LINKEDIN = 'https://www.linkedin.com/in/tarun-galagali-b1a45a20/';
+export const TARUN_FORBES = 'https://www.forbes.com/sites/tarungalagali/';
+
 // ─── Who the brief is for (single-user app: Tarun) ───
 const READER_PROFILE = [
   `=== WHO YOU'RE WRITING FOR ===`,
@@ -63,6 +67,21 @@ WHAT MAKES A GREAT "PERSON TO MEET":
   mental health, science, opportunity, democracy) OR the team is a model of good character.
 - There is a specific, nameable human — ideally a founder/CEO/CPO — worth profiling.
 - It's a story Tarun could credibly pitch to Forbes: a good person/team, doing good, with AI.
+
+COMMERCIAL BAR — THIS IS A HARD FILTER, NOT A NICE-TO-HAVE:
+Tarun only wants to profile people whose work could actually become a big, durable business.
+Good intentions are not enough. ONLY surface a person if at least one is clearly true:
+- The company has real commercial traction: meaningful revenue/ARR, fast growth, marquee
+  customers, or a top-tier round (Series A+ from credible investors), AND
+- The business model can plausibly SCALE to unicorn outcomes ($1B+) — the economics work as
+  they grow, not just a grant-funded or services-capped model, OR
+- The founder is clearly vetted and on a unicorn trajectory (proven operator, exceptional
+  team, structural advantage), even if early.
+GOOD EXAMPLE: Grow Therapy — AI/tech in mental health with a business model (insurance-enabled
+marketplace) that genuinely scales; the kind of company that can become a unicorn.
+AVOID: admirable-but-unproven or inherently small-scale orgs (e.g. early wellness apps with no
+traction, grant-dependent nonprofits, narrow point tools). If you're unsure it could be a
+billion-dollar company or led by someone clearly headed there, do not include it.
 - Avoid the obvious giants unless there's a genuinely fresh, human angle. Favor founders he
   could actually reach and who'd benefit from his platform.
 
@@ -160,7 +179,9 @@ Produce today's brief now. Search the web first to ground everything in real, re
 then return the single JSON object per your instructions:
 - 3 "ai_news" bullets: what Tarun needs to know in AI today.
 - 3 "people" to meet: inspiring founders/teams using AI for good, each a potential Forbes profile.
-Remember: he cares most about GOOD PEOPLE and GOOD TEAMS. Find humans worth meeting.`;
+Remember: he cares most about GOOD PEOPLE and GOOD TEAMS — but apply the COMMERCIAL BAR strictly.
+Only surface companies that could realistically become unicorns, or founders clearly on that
+path (think Grow Therapy, not an early unproven wellness app). Quality over feel-good.`;
 }
 
 /** Extract the last JSON object from a model response (handles ```json fences). */
@@ -257,9 +278,14 @@ Rules for a great email:
 - Make the ask light and clear: a short conversation, with an eye toward featuring them.
 - Warm, human, literary-but-plain voice. No buzzwords, no hype, no "I hope this email finds you well."
 - A clear, specific subject line.
+- END with a signature that includes BOTH of these full URLs on their own lines, so the
+  recipient can vet him (paste them as raw URLs exactly, do not shorten or relabel):
+    Forbes column: ${TARUN_FORBES}
+    LinkedIn: ${TARUN_LINKEDIN}
+  Reference his Forbes column naturally in the body too (that's where the profile would run).
 
 Return ONLY a JSON object, no fences, no commentary:
-{ "subject": "<subject line>", "body": "<email body, plain text with line breaks as \\n>" }`;
+{ "subject": "<subject line>", "body": "<email body, plain text with line breaks as \\n, including the signature with both URLs>" }`;
 
 /** Draft a personalized outbound intro email to a person's CEO/CPO. */
 export async function draftOutboundEmail(

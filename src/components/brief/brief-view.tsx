@@ -186,7 +186,6 @@ export function BriefView({ items }: Props) {
                 <div className="flex items-center justify-between">
                   <SourceLinks links={item.sourceLinks} />
                   <div className="flex items-center gap-2">
-                    <ReflectButton item={item} />
                     <button
                       onClick={() => setEmailingPerson({
                         id: item.id,
@@ -204,7 +203,6 @@ export function BriefView({ items }: Props) {
                     </button>
                   </div>
                 </div>
-                <ReflectionPreview item={item} />
               </article>
             ))}
           </div>

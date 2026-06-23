@@ -32,11 +32,45 @@ const CONFIDENCE: Record<CandidateEmail['confidence'], { label: string; cls: str
   fallback: { label: 'Fallback inbox', cls: 'text-surface-500 bg-surface-100', Icon: ShieldAlert },
 };
 
+function linkifyHtml(text: string): string {
+  const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  const urlRe = /(https?:\/\/[^\s]+)/g;
+  let html = '';
+  let last = 0;
+  let m: RegExpExecArray | null;
+  while ((m = urlRe.exec(text)) !== null) {
+    html += esc(text.slice(last, m.index));
+    const url = m[1];
+    html += `<a href="${esc(url)}">${esc(url)}</a>`;
+    last = m.index + url.length;
+  }
+  html += esc(text.slice(last));
+  return html.replace(/\n/g, '<br>');
+}
+
+// Copy with both rich (text/html) and plain text, so pasted URLs become clickable links.
+async function copyRich(plain: string) {
+  const AnyClipboardItem = (window as any).ClipboardItem;
+  try {
+    if (navigator.clipboard && AnyClipboardItem) {
+      const item = new AnyClipboardItem({
+        'text/html': new Blob([linkifyHtml(plain)], { type: 'text/html' }),
+        'text/plain': new Blob([plain], { type: 'text/plain' }),
+      });
+      await navigator.clipboard.write([item]);
+      return;
+    }
+  } catch {
+    /* fall through to plain */
+  }
+  await navigator.clipboard.writeText(plain);
+}
+
 function CopyButton({ value, label }: { value: string; label?: string }) {
   const [copied, setCopied] = useState(false);
   const copy = async () => {
     try {
-      await navigator.clipboard.writeText(value);
+      await copyRich(value);
       setCopied(true);
       toast.success(`${label || 'Copied'} to clipboard`);
       setTimeout(() => setCopied(false), 1500);
