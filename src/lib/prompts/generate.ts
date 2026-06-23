@@ -14,7 +14,8 @@ export const TARUN_FORBES = 'https://www.forbes.com/sites/tarungalagali/';
 const READER_PROFILE = [
   `=== WHO YOU'RE WRITING FOR ===`,
   `NAME: Tarun Galagali`,
-  `ROLE: Founder & CEO, Mandala For Us, Inc. — and a Forbes contributor.`,
+  `ROLE: Head of Product on Lattice's AI team, and a Forbes contributor.`,
+  `(He founded Mandala, an AI leadership coaching company, which was acquired by Lattice.)`,
   `LOCATION: Los Gatos, California`,
   ``,
   `THE ENDGAME (most important — this is what the brief serves):`,
@@ -25,10 +26,12 @@ const READER_PROFILE = [
   `potentially profile, then help him reach out to them.`,
   ``,
   `COMPANY CONTEXT:`,
-  `Mandala is an AI-powered leadership coaching platform native to Slack, combining`,
-  `neuroscience-based leadership development (a "parasympathetic intelligence" thesis`,
-  `developed with Dr. Michael Platt, Head of Neuroscience at Wharton) with AI. He is`,
-  `co-authoring "PAUSE: Leading with Parasympathetic Intelligence" (Basic Books, 2027).`,
+  `Tarun founded Mandala, an AI-powered leadership coaching platform native to Slack, combining`,
+  `neuroscience-based leadership development (a "parasympathetic intelligence" thesis developed`,
+  `with Dr. Michael Platt, Head of Neuroscience at Wharton) with AI. Mandala was ACQUIRED BY`,
+  `LATTICE, where Tarun now leads the AI product team — so he is always scouting founders and`,
+  `teams using AI for good, both to profile them and to stay connected. He is co-authoring`,
+  `"PAUSE: Leading with Parasympathetic Intelligence" (Basic Books, 2027).`,
   ``,
   `CAREER BACKGROUND (for credibility in outreach):`,
   `  - Harvard Business School MBA (2022)`,
@@ -264,28 +267,49 @@ export async function runDiscovery(
 //  PART 2 — Outbound intro email draft
 // ═══════════════════════════════════════════════════════════════════
 
-const EMAIL_SYSTEM_PROMPT = `You draft warm, concise, genuine outbound intro emails on Tarun's behalf.
+const EMAIL_SYSTEM_PROMPT = `You draft warm, sincere outbound intro emails on Tarun's behalf — emails that sound like HIM, not a template.
 
-These go to the CEO or CPO of a company doing inspiring AI-for-good work. The goal: open a
-real conversation that could lead to a Forbes profile of their good work and good team.
+These go to the CEO/CPO of a company doing inspiring AI-for-good work. Goal: a genuine human
+connection that could become a Forbes profile of their good work and good team.
 
-Rules for a great email:
-- Short. 120-160 words in the body. Busy founders skim.
-- Lead with something specific and true about THEM — what they're building and why it's good.
-  Show you actually paid attention. No flattery that could be copy-pasted to anyone.
-- Introduce Tarun briefly and credibly: Forbes contributor writing about good people/teams
-  using AI for good; founder/CEO of Mandala (AI leadership coaching); ex-Verily/Google; HBS.
-- Make the ask light and clear: a short conversation, with an eye toward featuring them.
-- Warm, human, literary-but-plain voice. No buzzwords, no hype, no "I hope this email finds you well."
-- A clear, specific subject line.
-- END with a signature that includes BOTH of these full URLs on their own lines, so the
-  recipient can vet him (paste them as raw URLs exactly, do not shorten or relabel):
-    Forbes column: ${TARUN_FORBES}
-    LinkedIn: ${TARUN_LINKEDIN}
-  Reference his Forbes column naturally in the body too (that's where the profile would run).
+STRUCTURE — follow this flow:
+1. Greeting by first name only ("Munjal,").
+2. Who Tarun is, woven naturally, with TWO INLINE hyperlinks (markdown links with readable anchor
+   text — NEVER a list of raw URLs at the bottom):
+   - "[Forbes contributor](${TARUN_FORBES})"
+   - an invitation to connect on "[LinkedIn](${TARUN_LINKEDIN})"
+   Include the Mandala→Lattice line (founded Mandala, an AI leadership coaching company, acquired
+   by Lattice, where he now leads the AI product team) and a brief background (Verily, Google, HBS MBA).
+3. Why he's reaching out: he's always on the lookout for founders/builders using AI for good —
+   to profile them for Forbes, and honestly to stay connected.
+4. Specific, genuine admiration of THEIR work — cite one concrete, true detail from the context.
+   Sincere and a little informal ("found it pretty inspiring that…", "very cool that…").
+5. The ask: a short conversation — 30 minutes. Offer to share the draft of the piece before it
+   goes live. Frame the goal as a profile centered on THEM and their team, not the technology.
+6. Close warm: a line like "Main goal is to connect and elevate stories like yours. :)" then
+   "Warmly," and "Tarun Galagali". NO title block, NO bare URLs at the bottom.
+
+VOICE:
+- Warm, human, sincere, lightly informal. A single ":)" near the end is welcome.
+- ~160-200 words. No "I hope this email finds you well", no buzzwords, no stiff "Warm regards".
+- Hyperlinks must be INLINE markdown links inside the sentences, never appended as raw URLs.
+
+GOLD EXAMPLE — match this tone, structure, and link style; adapt the specifics to the recipient:
+---
+Munjal,
+
+I'm a [Forbes contributor](${TARUN_FORBES}) — my column focuses on the people and teams using AI for genuinely good ends — and in my day job the founder of Mandala, an AI leadership coaching company that was acquired by Lattice, where I now lead the AI product team. Before that: product and strategy at Verily and Google, and an MBA at HBS. Here's my [LinkedIn](${TARUN_LINKEDIN}) if you'd like to connect.
+
+I'm always on the lookout for founders and builders using AI for good — to profile them for Forbes, and honestly to stay connected. I read about what you've been building at Hippocratic AI and found it pretty inspiring that you've made safety THE foundation, not an afterthought. Very cool that you've reached 115M+ patient interactions across six countries with no reported safety incidents.
+
+I'd love a short conversation — 30 minutes — to hear how you think about the 'do no harm' architecture from the inside. The goal would be a Forbes profile centered on you and your team, not the technology, and I'd happily share the draft before it goes live. Main goal is to connect and elevate stories like yours. :)
+
+Warmly,
+Tarun Galagali
+---
 
 Return ONLY a JSON object, no fences, no commentary:
-{ "subject": "<subject line>", "body": "<email body, plain text with line breaks as \\n, including the signature with both URLs>" }`;
+{ "subject": "<subject line>", "body": "<email body as plain text with \\n line breaks; include the two inline markdown hyperlinks; NO bottom signature block of raw URLs>" }`;
 
 /** Draft a personalized outbound intro email to a person's CEO/CPO. */
 export async function draftOutboundEmail(

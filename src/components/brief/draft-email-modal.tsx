@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, type ReactNode } from 'react';
 import { X, Loader2, Copy, Check, RefreshCw, ExternalLink, ShieldCheck, ShieldAlert, ShieldQuestion, Linkedin } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -32,30 +32,61 @@ const CONFIDENCE: Record<CandidateEmail['confidence'], { label: string; cls: str
   fallback: { label: 'Fallback inbox', cls: 'text-surface-500 bg-surface-100', Icon: ShieldAlert },
 };
 
-function linkifyHtml(text: string): string {
-  const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-  const urlRe = /(https?:\/\/[^\s]+)/g;
+const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+const MD_LINK = /\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g;
+
+function linkifyBare(escaped: string): string {
+  return escaped.replace(/(https?:\/\/[^\s<]+)/g, (u) => `<a href="${u}">${u}</a>`);
+}
+
+// Markdown links [label](url) + bare URLs -> HTML anchors (for rich paste).
+function toHtml(text: string): string {
   let html = '';
   let last = 0;
   let m: RegExpExecArray | null;
-  while ((m = urlRe.exec(text)) !== null) {
-    html += esc(text.slice(last, m.index));
-    const url = m[1];
-    html += `<a href="${esc(url)}">${esc(url)}</a>`;
-    last = m.index + url.length;
+  MD_LINK.lastIndex = 0;
+  while ((m = MD_LINK.exec(text)) !== null) {
+    html += linkifyBare(esc(text.slice(last, m.index)));
+    html += `<a href="${esc(m[2])}">${esc(m[1])}</a>`;
+    last = m.index + m[0].length;
   }
-  html += esc(text.slice(last));
+  html += linkifyBare(esc(text.slice(last)));
   return html.replace(/\n/g, '<br>');
 }
 
-// Copy with both rich (text/html) and plain text, so pasted URLs become clickable links.
-async function copyRich(plain: string) {
+// Markdown links -> "label (url)" so plain-text paste still carries the URL.
+function toPlain(text: string): string {
+  return text.replace(MD_LINK, '$1 ($2)');
+}
+
+// Render markdown links as clickable anchors for the on-screen preview.
+function renderBody(text: string): ReactNode {
+  const nodes: ReactNode[] = [];
+  let last = 0;
+  let key = 0;
+  let m: RegExpExecArray | null;
+  MD_LINK.lastIndex = 0;
+  while ((m = MD_LINK.exec(text)) !== null) {
+    if (m.index > last) nodes.push(text.slice(last, m.index));
+    nodes.push(
+      <a key={key++} href={m[2]} target="_blank" rel="noopener noreferrer" className="text-brand-600 underline">
+        {m[1]}
+      </a>,
+    );
+    last = m.index + m[0].length;
+  }
+  if (last < text.length) nodes.push(text.slice(last));
+  return nodes;
+}
+
+// Copy both rich (text/html) and plain text, so links paste as embedded hyperlinks.
+async function copyRich(text: string) {
   const AnyClipboardItem = (window as any).ClipboardItem;
   try {
     if (navigator.clipboard && AnyClipboardItem) {
       const item = new AnyClipboardItem({
-        'text/html': new Blob([linkifyHtml(plain)], { type: 'text/html' }),
-        'text/plain': new Blob([plain], { type: 'text/plain' }),
+        'text/html': new Blob([toHtml(text)], { type: 'text/html' }),
+        'text/plain': new Blob([toPlain(text)], { type: 'text/plain' }),
       });
       await navigator.clipboard.write([item]);
       return;
@@ -63,7 +94,7 @@ async function copyRich(plain: string) {
   } catch {
     /* fall through to plain */
   }
-  await navigator.clipboard.writeText(plain);
+  await navigator.clipboard.writeText(toPlain(text));
 }
 
 function CopyButton({ value, label }: { value: string; label?: string }) {
@@ -207,7 +238,7 @@ export function DraftEmailModal({ person, onClose }: Props) {
                   <p className="text-sm font-medium text-surface-900">{draft.subject}</p>
                 </div>
                 <div className="border-t border-surface-100 pt-3">
-                  <p className="text-sm text-surface-700 whitespace-pre-wrap leading-relaxed">{draft.body}</p>
+                  <p className="text-sm text-surface-700 whitespace-pre-wrap leading-relaxed">{renderBody(draft.body)}</p>
                 </div>
               </div>
             ) : (
