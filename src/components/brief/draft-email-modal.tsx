@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback, type ReactNode } from 'react';
-import { X, Loader2, Copy, Check, RefreshCw, ExternalLink, ShieldCheck, ShieldAlert, ShieldQuestion, Linkedin } from 'lucide-react';
+import { X, Loader2, Copy, Check, RefreshCw, ExternalLink, ShieldCheck, ShieldAlert, ShieldQuestion, Linkedin, Send } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface CandidateEmail {
@@ -95,6 +95,13 @@ async function copyRich(text: string) {
     /* fall through to plain */
   }
   await navigator.clipboard.writeText(toPlain(text));
+}
+
+// Open a Gmail compose window prefilled with recipient, subject, and the note (plain text).
+function gmailComposeUrl(to: string | null, subject: string, body: string): string {
+  const params = new URLSearchParams({ view: 'cm', fs: '1', su: subject, body: toPlain(body) });
+  if (to) params.set('to', to);
+  return `https://mail.google.com/mail/?${params.toString()}`;
 }
 
 function CopyButton({ value, label }: { value: string; label?: string }) {
@@ -253,7 +260,19 @@ export function DraftEmailModal({ person, onClose }: Props) {
             <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
             Regenerate
           </button>
-          <button onClick={onClose} className="btn-primary">Done</button>
+          <div className="flex gap-2">
+            {draft && (
+              <a
+                href={gmailComposeUrl(draft.toEmail, draft.subject, draft.body)}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="btn-primary"
+              >
+                <Send className="w-4 h-4" /> Open in Gmail
+              </a>
+            )}
+            <button onClick={onClose} className="btn-secondary">Done</button>
+          </div>
         </div>
       </div>
     </div>

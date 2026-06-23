@@ -71,20 +71,19 @@ WHAT MAKES A GREAT "PERSON TO MEET":
 - There is a specific, nameable human — ideally a founder/CEO/CPO — worth profiling.
 - It's a story Tarun could credibly pitch to Forbes: a good person/team, doing good, with AI.
 
-COMMERCIAL BAR — THIS IS A HARD FILTER, NOT A NICE-TO-HAVE:
-Tarun only wants to profile people whose work could actually become a big, durable business.
-Good intentions are not enough. ONLY surface a person if at least one is clearly true:
-- The company has real commercial traction: meaningful revenue/ARR, fast growth, marquee
-  customers, or a top-tier round (Series A+ from credible investors), AND
-- The business model can plausibly SCALE to unicorn outcomes ($1B+) — the economics work as
-  they grow, not just a grant-funded or services-capped model, OR
-- The founder is clearly vetted and on a unicorn trajectory (proven operator, exceptional
-  team, structural advantage), even if early.
-GOOD EXAMPLE: Grow Therapy — AI/tech in mental health with a business model (insurance-enabled
-marketplace) that genuinely scales; the kind of company that can become a unicorn.
-AVOID: admirable-but-unproven or inherently small-scale orgs (e.g. early wellness apps with no
-traction, grant-dependent nonprofits, narrow point tools). If you're unsure it could be a
-billion-dollar company or led by someone clearly headed there, do not include it.
+COMMERCIAL BAR & STAGE MIX — HARD FILTERS:
+Tarun wants to discover rising stars EARLY and elevate them — vetted founders on a clear
+unicorn trajectory, caught before they're household names.
+- STAGE MIX: aim for ~80% SEED or SERIES A companies; the remaining ~20% may be Series B, C,
+  or D. HARD CAP: nothing later than Series D. Do NOT surface late-stage, pre-IPO, public, or
+  mega-cap companies (no OpenAI/Anthropic/Databricks-tier giants).
+- Even at Seed/Series A, the founder must be clearly VETTED and the business model must
+  plausibly SCALE to a $1B+ outcome — strong team, real early traction, a structural advantage,
+  credible investors. Promise AND proof, not just good intentions.
+GOOD EXAMPLE: Grow Therapy — a scalable, insurance-enabled model in mental health.
+AVOID on one side: admirable-but-unproven tiny apps, grant-dependent nonprofits, narrow point
+tools. AVOID on the other side: already-huge late-stage/public giants. The sweet spot is the
+inspiring Seed/Series A founder on their way up.
 - Avoid the obvious giants unless there's a genuinely fresh, human angle. Favor founders he
   could actually reach and who'd benefit from his platform.
 
@@ -182,9 +181,10 @@ Produce today's brief now. Search the web first to ground everything in real, re
 then return the single JSON object per your instructions:
 - 3 "ai_news" bullets: what Tarun needs to know in AI today.
 - 3 "people" to meet: inspiring founders/teams using AI for good, each a potential Forbes profile.
-Remember: he cares most about GOOD PEOPLE and GOOD TEAMS — but apply the COMMERCIAL BAR strictly.
-Only surface companies that could realistically become unicorns, or founders clearly on that
-path (think Grow Therapy, not an early unproven wellness app). Quality over feel-good.`;
+Remember: he cares most about GOOD PEOPLE and GOOD TEAMS — but apply the COMMERCIAL BAR &
+STAGE MIX strictly. Lean ~80% Seed/Series A (cap at Series D, no giants); catch vetted
+founders on a clear unicorn trajectory EARLY (think Grow Therapy, not an unproven wellness
+app and not a late-stage household name). Quality over feel-good.`;
 }
 
 /** Extract the last JSON object from a model response (handles ```json fences). */
